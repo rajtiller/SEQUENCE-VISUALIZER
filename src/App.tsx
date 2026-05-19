@@ -6,12 +6,15 @@ import {
   type CoordinateRow,
 } from './lib/parseCsv'
 import {
+  defaultGraphBounds,
   defaultGraphPlanConfig,
   normalizeGraphBounds,
   suggestGraphBounds,
+  type CoordinateSystem,
   type GraphBounds,
   type GraphPlanConfig,
 } from './lib/graphPlanConfig'
+import { rowsToCartesianPoints } from './lib/polarGrid'
 import { defaultVizConfig, type VizConfig } from './lib/vizConfig'
 import './App.css'
 
@@ -68,7 +71,7 @@ function App() {
       setFileName(name)
       setGraphPlan((p) => ({
         ...p,
-        bounds: suggestGraphBounds(parsed.rows),
+        bounds: suggestGraphBounds(parsed.rows, p.coordinateSystem),
       }))
     } catch (e) {
       setParseError(e instanceof Error ? e.message : 'Could not parse CSV.')
@@ -118,29 +121,44 @@ function App() {
     e.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  const points = useMemo(
-    () =>
-      coordinateRows.length > 0
-        ? buildChartPoints(coordinateRows, cfg, graphPlan.pointCount)
-        : [],
-    [coordinateRows, cfg, graphPlan.pointCount],
-  )
+  const rowsForChart = useMemo(() => {
+    const cap = Math.max(
+      1,
+      Math.min(graphPlan.pointCount, 20_000, coordinateRows.length),
+    )
+    return coordinateRows.slice(0, cap)
+  }, [coordinateRows, graphPlan.pointCount])
+
+  const points = useMemo(() => {
+    if (rowsForChart.length === 0) return []
+    if (graphPlan.coordinateSystem === 'polar') {
+      return rowsToCartesianPoints(rowsForChart).map((p, i) => ({
+        ...p,
+        label: String(rowsForChart[i].x),
+      }))
+    }
+    return buildChartPoints(rowsForChart, cfg, rowsForChart.length)
+  }, [rowsForChart, graphPlan.coordinateSystem, cfg])
 
   const previewRows = useMemo(
     () => coordinateRows.slice(0, 12),
     [coordinateRows],
   )
 
-  const isPixels = graphPlan.coordinateSystem === 'pixels'
+  const isPolar = graphPlan.coordinateSystem === 'polar'
+  const showRectPixels = graphPlan.usePixels && !isPolar
 
   const setBound = useCallback((key: keyof GraphBounds, raw: string) => {
     const n = Number.parseFloat(raw)
     setGraphPlan((p) => ({
       ...p,
-      bounds: normalizeGraphBounds({
-        ...p.bounds,
-        [key]: Number.isFinite(n) ? n : p.bounds[key],
-      }),
+      bounds: normalizeGraphBounds(
+        {
+          ...p.bounds,
+          [key]: Number.isFinite(n) ? n : p.bounds[key],
+        },
+        p.coordinateSystem,
+      ),
     }))
   }, [])
 
@@ -149,8 +167,9 @@ function App() {
       <header className="viz-header">
         <h1>CSV visualizer</h1>
         <p className="viz-lead">
-          Load a CSV where each line is x, y, and optionally z (comma- or
-          space-separated).
+          {isPolar
+            ? 'Each line: x = radius, y = angle in radians (from +x). Optional z. Comma- or space-separated.'
+            : 'Each line: x, y, and optional z. Comma- or space-separated.'}
         </p>
       </header>
 
@@ -189,8 +208,8 @@ function App() {
               <table className="preview-table">
                 <thead>
                   <tr>
-                    <th>x</th>
-                    <th>y</th>
+                    <th>{isPolar ? 'r' : 'x'}</th>
+                    <th>{isPolar ? 'θ (rad)' : 'y'}</th>
                     {hasZ && <th>z</th>}
                   </tr>
                 </thead>
@@ -219,7 +238,7 @@ function App() {
 
           <div className="plan-section">
             <h3 className="plan-section-title">Preview</h3>
-            {!isPixels && (
+            {!showRectPixels && (
             <div className="field-grid">
               <label className="field">
                 <span>Chart type (preview)</span>
@@ -274,7 +293,7 @@ function App() {
           </div>
 
           <div className="chart-wrap chart-wrap-preview">
-            {isPixels ? (
+            {showRectPixels ? (
               <PixelGridChart
                 rows={coordinateRows}
                 bounds={graphPlan.bounds}
@@ -291,16 +310,17 @@ function App() {
             )}
           </div>
 
-          {isPixels && coordinateRows.length > 0 && (
+          {showRectPixels && coordinateRows.length > 0 && (
             <p className="chart-caption chart-caption-preview">
-              Rectangle grid: each CSV (x, y) fills one unit cell; size comes from
-              graph bounds below.
+              Rectangles: each (x, y) fills one unit cell; bounds set grid size.
             </p>
           )}
-          {!isPixels && points.length > 0 && (
+          {!showRectPixels && points.length > 0 && (
             <p className="chart-caption chart-caption-preview">
-              Preview: {points.length} point{points.length === 1 ? '' : 's'}{' '}
-              (x, y{hasZ ? ', z' : ''} per line; capped by point count).
+              Preview: {points.length} point{points.length === 1 ? '' : 's'}
+              {isPolar
+                ? ' (polar → Cartesian for plot; capped by point count).'
+                : ` (x, y${hasZ ? ', z' : ''} per line; capped by point count).`}
             </p>
           )}
 
@@ -311,19 +331,39 @@ function App() {
                 <span>1. Graph type</span>
                 <select
                   value={graphPlan.coordinateSystem}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const system = e.target.value as CoordinateSystem
                     setGraphPlan((p) => ({
                       ...p,
-                      coordinateSystem: e.target
-                        .value as GraphPlanConfig['coordinateSystem'],
+                      coordinateSystem: system,
+                      usePixels: system === 'polar' ? false : p.usePixels,
+                      bounds:
+                        coordinateRows.length > 0
+                          ? suggestGraphBounds(coordinateRows, system)
+                          : defaultGraphBounds(system),
                     }))
-                  }
+                  }}
                 >
                   <option value="rectangular">Rectangular coordinates</option>
-                  <option value="pixels">Pixels (rectangle grid)</option>
                   <option value="polar">Polar coordinates</option>
                 </select>
               </label>
+
+              {!isPolar && (
+                <label className="field checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={graphPlan.usePixels}
+                    onChange={(e) =>
+                      setGraphPlan((p) => ({
+                        ...p,
+                        usePixels: e.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Pixels (filled rectangles on the grid)</span>
+                </label>
+              )}
 
               <label className="field">
                 <span>2. Grid lines</span>
@@ -434,12 +474,15 @@ function App() {
               <div className="field bounds-field">
                 <span>1. Graph bounds</span>
                 <p className="field-hint">
-                  Lower and upper limits for the x and y axes; each integer
-                  coordinate is one rectangle on the grid.
+                  {isPolar
+                    ? 'R and angle (radians) shown on the polar plot.'
+                    : 'X and Y limits; each integer (x, y) is one rectangle when Pixels is on.'}
                 </p>
                 <div className="bounds-grid">
                   <label className="metric">
-                    <span className="metric-label">X lower</span>
+                    <span className="metric-label">
+                      {isPolar ? 'R lower' : 'X lower'}
+                    </span>
                     <input
                       type="number"
                       step="any"
@@ -448,7 +491,9 @@ function App() {
                     />
                   </label>
                   <label className="metric">
-                    <span className="metric-label">X upper</span>
+                    <span className="metric-label">
+                      {isPolar ? 'R upper' : 'X upper'}
+                    </span>
                     <input
                       type="number"
                       step="any"
@@ -457,7 +502,9 @@ function App() {
                     />
                   </label>
                   <label className="metric">
-                    <span className="metric-label">Y lower</span>
+                    <span className="metric-label">
+                      {isPolar ? 'Angle lower (rad)' : 'Y lower'}
+                    </span>
                     <input
                       type="number"
                       step="any"
@@ -466,7 +513,9 @@ function App() {
                     />
                   </label>
                   <label className="metric">
-                    <span className="metric-label">Y upper</span>
+                    <span className="metric-label">
+                      {isPolar ? 'Angle upper (rad)' : 'Y upper'}
+                    </span>
                     <input
                       type="number"
                       step="any"

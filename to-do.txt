@@ -1,7 +1,7 @@
-for pixels, make the graph bounds (and therefor pixel size) adjustable
 get everything on one page
 add option to display one step at a time
 make it so if the csv is in a certain format, the parameters are already configured
 allow multiple graphs to be on the same plot
 add/implement bar chart, where we can see how manys x's have a given y
 allow pixels to change color
+implement a database which allows you to save certain graphs
