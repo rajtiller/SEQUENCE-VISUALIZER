@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GraphRenderer } from './components/GraphRenderer'
 import { ProgressBar } from './components/ProgressBar'
+import { downloadTextFile } from './lib/downloadFile'
+import { downloadGraphPng, findChartSvg } from './lib/downloadGraphPng'
 import {
   estimateGraphExportRowCount,
   hasGraphExportData,
@@ -9,6 +11,11 @@ import {
   shouldShowGraphProgress,
   type GraphExportPayload,
 } from './lib/graphExport'
+import {
+  buildPresetCsvText,
+  graphPngDownloadName,
+  presetCsvDownloadName,
+} from './lib/presetCsv'
 import {
   prepareGraphRenderData,
   type PreparedGraphRender,
@@ -27,6 +34,9 @@ export function GraphView() {
     message: 'Loading graph…',
   })
   const [size, setSize] = useState({ width: 800, height: 600 })
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportingPng, setExportingPng] = useState(false)
+  const chartHostRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     document.documentElement.classList.add('graph-view-route')
@@ -125,6 +135,43 @@ export function GraphView() {
     }
   }, [])
 
+  const onDownloadPng = useCallback(async () => {
+    if (loadState.status !== 'ready') return
+    const host = chartHostRef.current
+    if (!host) return
+    const svg = findChartSvg(host)
+    if (!svg) {
+      setExportError('Could not find graph to export.')
+      return
+    }
+    setExportError(null)
+    setExportingPng(true)
+    try {
+      await downloadGraphPng(
+        svg,
+        graphPngDownloadName(loadState.payload.fileName),
+      )
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'PNG export failed.')
+    } finally {
+      setExportingPng(false)
+    }
+  }, [loadState])
+
+  const onDownloadPresetCsv = useCallback(() => {
+    if (loadState.status !== 'ready') return
+    setExportError(null)
+    try {
+      const text = buildPresetCsvText(loadState.payload)
+      downloadTextFile(
+        text,
+        presetCsvDownloadName(loadState.payload.fileName),
+      )
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'CSV export failed.')
+    }
+  }, [loadState])
+
   if (loadState.status === 'loading') {
     return (
       <div className="graph-view graph-view--loading">
@@ -151,12 +198,36 @@ export function GraphView() {
 
   return (
     <div className="graph-view" aria-label="Generated graph (read-only)">
-      <GraphRenderer
-        payload={payload}
-        prepared={prepared}
-        width={size.width}
-        height={size.height}
-      />
+      <div className="graph-view__chart" ref={chartHostRef}>
+        <GraphRenderer
+          payload={payload}
+          prepared={prepared}
+          width={size.width}
+          height={size.height}
+        />
+      </div>
+      <div className="graph-view__toolbar" role="toolbar" aria-label="Export graph">
+        <button
+          type="button"
+          className="graph-view__btn"
+          disabled={exportingPng}
+          onClick={() => void onDownloadPng()}
+        >
+          {exportingPng ? 'Saving PNG…' : 'Download PNG'}
+        </button>
+        <button
+          type="button"
+          className="graph-view__btn"
+          onClick={onDownloadPresetCsv}
+        >
+          Download preset CSV
+        </button>
+      </div>
+      {exportError ? (
+        <p className="graph-view__export-error" role="alert">
+          {exportError}
+        </p>
+      ) : null}
     </div>
   )
 }

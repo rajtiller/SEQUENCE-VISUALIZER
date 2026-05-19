@@ -6,3 +6,6 @@ allow pixels to change color
 implement a database which allows you to save certain graphs
 allow more points to be plotted
 perhaps allow x and y to be intercahngeable and even allow a column to be used for multiple things. for example, if we want the line graph to slowly change color as it goes along, we couold use its x to achieve this
+fix the number boxes, its hard to type 100 without doing a round about way
+accept multiple data types and label
+add option to only use first n points of sample

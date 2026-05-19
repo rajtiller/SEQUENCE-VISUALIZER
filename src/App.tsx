@@ -1,10 +1,17 @@
 import { useCallback, useMemo, useState, type DragEvent } from 'react'
 import { DataChart } from './components/DataChart'
+import { ListFileInput } from './components/ListFileInput'
 import { PixelGridChart } from './components/PixelGridChart'
+import type { CoordinateRow } from './lib/parseCsv'
 import {
-  parseCoordinateCsv,
-  type CoordinateRow,
-} from './lib/parseCsv'
+  emptyListsInput,
+  listsInputLabel,
+  mergeListsToCoordinateRows,
+  parseNumberList,
+  type InputMode,
+  type ListsInput,
+} from './lib/dataInput'
+import { parseCsvWithPreset } from './lib/presetCsv'
 import {
   defaultGraphBounds,
   defaultGraphPlanConfig,
@@ -27,42 +34,127 @@ import './App.css'
 const PREVIEW_ROW_COUNT = 4
 
 function App() {
+  const [inputMode, setInputMode] = useState<InputMode>('combined')
   const [fileName, setFileName] = useState<string | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
-  const [coordinateRows, setCoordinateRows] = useState<CoordinateRow[]>([])
-  const [hasZ, setHasZ] = useState(false)
+  const [listWarning, setListWarning] = useState<string | null>(null)
+  const [combinedRows, setCombinedRows] = useState<CoordinateRow[]>([])
+  const [combinedHasZ, setCombinedHasZ] = useState(false)
+  const [lists, setLists] = useState<ListsInput>(() => emptyListsInput())
   const [cfg, setCfg] = useState<VizConfig>(() => defaultVizConfig())
   const [graphPlan, setGraphPlan] = useState<GraphPlanConfig>(() =>
     defaultGraphPlanConfig(),
   )
 
-  const applyTable = useCallback((text: string, name: string | null) => {
-    setParseError(null)
-    try {
-      const parsed = parseCoordinateCsv(text)
-      if (parsed.rows.length === 0) {
-        setParseError(
-          'No points found. Each line needs at least two numbers: x, y (optional z).',
-        )
-        setCoordinateRows([])
-        setHasZ(false)
+  const applyBoundsFromRows = useCallback((rows: CoordinateRow[]) => {
+    setGraphPlan((p) => ({
+      ...p,
+      bounds: suggestGraphBounds(rows, p.coordinateSystem),
+    }))
+  }, [])
+
+  const applyTable = useCallback(
+    (text: string, name: string | null) => {
+      setParseError(null)
+      setListWarning(null)
+      try {
+        const parsed = parseCsvWithPreset(text)
+        if (parsed.rows.length === 0) {
+          setParseError(
+            'No points found. Each line needs at least two numbers: x, y (optional z).',
+          )
+          setCombinedRows([])
+          setCombinedHasZ(false)
+          setFileName(name)
+          return
+        }
+        setInputMode('combined')
+        setCombinedRows(parsed.rows)
+        setCombinedHasZ(parsed.hasZ)
         setFileName(name)
+        if (parsed.preset) {
+          setGraphPlan(parsed.preset.graphPlan)
+          setCfg(parsed.preset.vizConfig)
+        } else {
+          applyBoundsFromRows(parsed.rows)
+        }
+      } catch (e) {
+        setParseError(e instanceof Error ? e.message : 'Could not parse CSV.')
+        setCombinedRows([])
+        setCombinedHasZ(false)
+        setFileName(name)
+      }
+    },
+    [applyBoundsFromRows],
+  )
+
+  const applyListFile = useCallback(
+    (key: 'x' | 'y' | 'z', text: string, name: string) => {
+      setParseError(null)
+      const values = parseNumberList(text)
+      if (values.length === 0) {
+        setParseError(`No numbers found in ${key.toUpperCase()} list.`)
         return
       }
-      setCoordinateRows(parsed.rows)
-      setHasZ(parsed.hasZ)
-      setFileName(name)
-      setGraphPlan((p) => ({
-        ...p,
-        bounds: suggestGraphBounds(parsed.rows, p.coordinateSystem),
-      }))
-    } catch (e) {
-      setParseError(e instanceof Error ? e.message : 'Could not parse CSV.')
-      setCoordinateRows([])
-      setHasZ(false)
-      setFileName(name)
-    }
+      setLists((prev) => {
+        const next = {
+          ...prev,
+          [key]: { values, fileName: name },
+        }
+        const merged = mergeListsToCoordinateRows(
+          next.x.values,
+          next.y.values,
+          next.z.values.length > 0 ? next.z.values : undefined,
+        )
+        setListWarning(merged.error)
+        if (merged.rows.length > 0) applyBoundsFromRows(merged.rows)
+        return next
+      })
+    },
+    [applyBoundsFromRows],
+  )
+
+  const clearList = useCallback((key: 'x' | 'y' | 'z') => {
+    setLists((prev) => {
+      const next = { ...prev, [key]: { values: [], fileName: null } }
+      const merged = mergeListsToCoordinateRows(
+        next.x.values,
+        next.y.values,
+        next.z.values.length > 0 ? next.z.values : undefined,
+      )
+      setListWarning(merged.error)
+      return next
+    })
   }, [])
+
+  const readListFile = useCallback(
+    (key: 'x' | 'y' | 'z', file: File) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const text = typeof reader.result === 'string' ? reader.result : ''
+        applyListFile(key, text, file.name)
+      }
+      reader.onerror = () => setParseError(`Failed to read ${key.toUpperCase()} file.`)
+      reader.readAsText(file)
+    },
+    [applyListFile],
+  )
+
+  const listsDerived = useMemo(
+    () =>
+      mergeListsToCoordinateRows(
+        lists.x.values,
+        lists.y.values,
+        lists.z.values.length > 0 ? lists.z.values : undefined,
+      ),
+    [lists],
+  )
+
+  const coordinateRows =
+    inputMode === 'combined' ? combinedRows : listsDerived.rows
+  const hasZ = inputMode === 'combined' ? combinedHasZ : listsDerived.hasZ
+  const displayFileName =
+    inputMode === 'combined' ? fileName : listsInputLabel(lists)
 
   const onFile = useCallback(
     (file: File | null) => {
@@ -128,7 +220,7 @@ function App() {
         coordinateRows,
         graphPlan,
         vizConfig: cfg,
-        fileName,
+        fileName: displayFileName,
       },
       (value, message) => {
         if (showProgress) setCreateGraphProgress({ value, message })
@@ -148,7 +240,7 @@ function App() {
     coordinateRows,
     graphPlan,
     cfg,
-    fileName,
+    displayFileName,
     createGraphProgress,
   ])
 
@@ -180,9 +272,11 @@ function App() {
       <header className="viz-header-compact">
         <h1>CSV visualizer</h1>
         <p className="viz-tagline">
-          {isPolar
-            ? 'x = radius, y = angle (rad)'
-            : 'x, y per line · optional z'}
+          {inputMode === 'lists'
+            ? 'Separate lists · y-only uses row index as x'
+            : isPolar
+              ? 'x = radius, y = angle (rad)'
+              : 'x, y per line · optional z'}
         </p>
       </header>
 
@@ -190,22 +284,74 @@ function App() {
         <aside className="viz-data" aria-labelledby="data-heading">
           <h2 id="data-heading">Data</h2>
 
-          <label
-            className="file-drop-compact"
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-          >
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
-              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-            />
-            <strong>{fileName ?? 'Choose CSV'}</strong>
-            {fileName ? '' : ' — click or drop'}
-          </label>
+          <div className="input-mode-row" role="radiogroup" aria-label="Input format">
+            <label className="input-mode-option">
+              <input
+                type="radio"
+                name="input-mode"
+                checked={inputMode === 'combined'}
+                onChange={() => setInputMode('combined')}
+              />
+              Combined file
+            </label>
+            <label className="input-mode-option">
+              <input
+                type="radio"
+                name="input-mode"
+                checked={inputMode === 'lists'}
+                onChange={() => setInputMode('lists')}
+              />
+              Separate lists
+            </label>
+          </div>
+
+          {inputMode === 'combined' ? (
+            <label
+              className="file-drop-compact"
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+            >
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              />
+              <strong>{fileName ?? 'Choose CSV'}</strong>
+              {fileName ? '' : ' — x, y[, z] per line'}
+            </label>
+          ) : (
+            <div className="lists-input-panel">
+              <ListFileInput
+                label="X list"
+                fileName={lists.x.fileName}
+                valueCount={lists.x.values.length}
+                onFile={(f) => readListFile('x', f)}
+                onClear={() => clearList('x')}
+              />
+              <ListFileInput
+                label="Y list"
+                hint="Y only → x is 0, 1, 2, … (histogram-ready)"
+                fileName={lists.y.fileName}
+                valueCount={lists.y.values.length}
+                onFile={(f) => readListFile('y', f)}
+                onClear={() => clearList('y')}
+              />
+              <ListFileInput
+                label="Z list"
+                optional
+                fileName={lists.z.fileName}
+                valueCount={lists.z.values.length}
+                onFile={(f) => readListFile('z', f)}
+                onClear={() => clearList('z')}
+              />
+            </div>
+          )}
 
           {parseError && <p className="viz-error">{parseError}</p>}
+          {inputMode === 'lists' && listWarning && (
+            <p className="viz-warn">{listWarning}</p>
+          )}
 
           {coordinateRows.length > 0 && (
             <p className="viz-meta">

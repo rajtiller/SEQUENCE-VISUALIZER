@@ -78,6 +78,9 @@ export function parseCoordinateCsv(text: string): ParsedCoordinates {
   let hasZ = false
 
   for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+
     const fields = splitDataLine(line)
     if (fields.length < 2) continue
 
