@@ -1,4 +1,4 @@
-import type { ChartKind } from '../lib/vizConfig'
+import type { ChartKind, HistogramSource } from '../lib/vizConfig'
 import type { GraphBounds } from '../lib/graphPlanConfig'
 
 export type ChartPoint = { x: number; y: number; z?: number; label: string }
@@ -14,6 +14,9 @@ type Props = {
   /** When set (rectangular plots), map data into these axis limits. */
   bounds?: GraphBounds
   useGraphBounds?: boolean
+  /** Label for histogram value axis (e.g. "y" or "radius"). */
+  histogramValueLabel?: string
+  histogramSource?: HistogramSource
 }
 
 const DEFAULT_W = 560
@@ -81,6 +84,8 @@ export function DataChart({
   height = DEFAULT_H,
   bounds,
   useGraphBounds = false,
+  histogramValueLabel = 'value',
+  histogramSource = 'y',
 }: Props) {
   const W = width
   const H = height
@@ -113,17 +118,38 @@ export function DataChart({
     )
   }
 
-  const boundDomain = useGraphBounds ? domainFromBounds(bounds) : null
+  const isHistogram = kind === 'histogram'
+  const boundDomain = useGraphBounds && !isHistogram ? domainFromBounds(bounds) : null
+  const boundX =
+    isHistogram && useGraphBounds && bounds
+      ? histogramSource === 'x'
+        ? { xMin: bounds.xMin, xMax: bounds.xMax, yMin: 0, yMax: 1 }
+        : { xMin: bounds.yMin, xMax: bounds.yMax, yMin: 0, yMax: 1 }
+      : null
+  const boundXExtent = boundX
+    ? { min: boundX.xMin, max: boundX.xMax }
+    : null
+
   const xs = points.map((p) => p.x)
   const ys = points.map((p) => p.y)
-  const xExtent = boundDomain
-    ? { min: boundDomain.xMin, max: boundDomain.xMax }
-    : extent(xs)
-  const yExtent = boundDomain
-    ? { min: boundDomain.yMin, max: boundDomain.yMax }
-    : extent(ys)
+  const xExtent = boundXExtent ?? extent(xs)
+  let yMin: number
+  let yMax: number
+  if (isHistogram) {
+    yMin = 0
+    let maxCount = 0
+    for (const p of points) {
+      if (p.y > maxCount) maxCount = p.y
+    }
+    yMax = Math.max(1, maxCount * 1.08)
+  } else {
+    const yExtent = boundDomain
+      ? { min: boundDomain.yMin, max: boundDomain.yMax }
+      : extent(ys)
+    yMin = yExtent.min
+    yMax = yExtent.max
+  }
   const { min: xMin, max: xMax } = xExtent
-  const { min: yMin, max: yMax } = yExtent
 
   const sxNumeric = (x: number) =>
     pad.l + ((x - xMin) / (xMax - xMin)) * innerW
@@ -147,7 +173,10 @@ export function DataChart({
           .join(' ')
       : ''
 
-  const barWidth = Math.max(4, Math.min(28, innerW / Math.max(points.length, 1) - 4))
+  const barWidth = Math.max(
+    4,
+    Math.min(28, (innerW / Math.max(points.length, 1)) * (isHistogram ? 0.92 : 1) - 4),
+  )
 
   return (
     <svg
@@ -251,6 +280,48 @@ export function DataChart({
           )
         })}
 
+      {kind === 'histogram' &&
+        points.map((p, i) => {
+          const cx = sxNumeric(p.x)
+          const y0 = sy(yMin)
+          const y1 = sy(p.y)
+          const top = Math.min(y0, y1)
+          const barHeight = Math.abs(y1 - y0)
+          return (
+            <rect
+              key={`h-${i}`}
+              x={cx - barWidth / 2}
+              y={top}
+              width={barWidth}
+              height={Math.max(barHeight, 1)}
+              fill="var(--accent)"
+              opacity={0.85}
+            />
+          )
+        })}
+
+      {kind === 'histogram' &&
+        points.map((p, i) => {
+          if (i % Math.ceil(points.length / 6) !== 0 && i !== points.length - 1) {
+            return null
+          }
+          const label =
+            p.label.length > 12 ? `${p.label.slice(0, 11)}…` : p.label
+          return (
+            <text
+              key={`hlbl-${i}`}
+              x={sxNumeric(p.x)}
+              y={H - pad.b + 14}
+              textAnchor="middle"
+              fill="var(--text)"
+              fontSize="8"
+              fontFamily="var(--mono)"
+            >
+              {label}
+            </text>
+          )
+        })}
+
       {kind === 'bar' &&
         points.map((p, i) => {
           if (i % Math.ceil(points.length / 8) !== 0 && i !== points.length - 1) {
@@ -279,7 +350,11 @@ export function DataChart({
         fontSize="11"
         fontFamily="var(--mono)"
       >
-        {kind === 'bar' ? `${points.length} categories` : 'x axis'}
+        {kind === 'histogram'
+          ? `${histogramValueLabel} (bins)`
+          : kind === 'bar'
+            ? `${points.length} categories`
+            : 'x axis'}
       </text>
       <text
         x={pad.l}
@@ -288,7 +363,7 @@ export function DataChart({
         fontSize="11"
         fontFamily="var(--mono)"
       >
-        y: {yMax.toPrecision(4)}
+        {kind === 'histogram' ? `count (max ${Math.round(yMax)})` : `y: ${yMax.toPrecision(4)}`}
       </text>
     </svg>
   )

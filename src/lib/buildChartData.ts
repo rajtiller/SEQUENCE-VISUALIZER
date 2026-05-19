@@ -1,7 +1,12 @@
 import type { ChartPoint } from '../components/DataChart'
 import type { CoordinateRow } from './parseCsv'
-import { isAllAtOnceDisplay, type GraphPlanConfig } from './graphPlanConfig'
+import {
+  isAllAtOnceDisplay,
+  type GraphBounds,
+  type GraphPlanConfig,
+} from './graphPlanConfig'
 import { rowsToCartesianPoints } from './polarGrid'
+import { buildHistogramChartPoints } from './histogram'
 import type { VizConfig } from './vizConfig'
 
 /** Max points drawn in the full-screen graph (preview uses `graphPlan.pointCount`). */
@@ -11,9 +16,20 @@ export function buildChartPoints(
   rows: CoordinateRow[],
   cfg: VizConfig,
   maxPoints: number,
+  bounds?: GraphBounds,
 ): ChartPoint[] {
   const cap = Math.max(1, Math.min(maxPoints, 20_000))
   const slice = rows.slice(0, cap)
+
+  if (cfg.chartKind === 'histogram') {
+    const domain =
+      bounds && bounds.xMax > bounds.xMin && bounds.yMax > bounds.yMin
+        ? cfg.histogramSource === 'x'
+          ? { domainMin: bounds.xMin, domainMax: bounds.xMax }
+          : { domainMin: bounds.yMin, domainMax: bounds.yMax }
+        : undefined
+    return buildHistogramChartPoints(slice, cfg.histogramSource, domain)
+  }
 
   if (cfg.chartKind === 'bar') {
     return slice.map((row, i) => ({
@@ -44,6 +60,10 @@ export function resolveChartPoints(
   const slice = rows.slice(0, cap)
   if (slice.length === 0) return []
 
+  if (cfg.chartKind === 'histogram') {
+    return buildChartPoints(slice, cfg, slice.length)
+  }
+
   if (graphPlan.coordinateSystem === 'polar') {
     return rowsToCartesianPoints(slice).map((p, i) => ({
       ...p,
@@ -51,7 +71,7 @@ export function resolveChartPoints(
     }))
   }
 
-  return buildChartPoints(slice, cfg, slice.length)
+  return buildChartPoints(slice, cfg, slice.length, graphPlan.bounds)
 }
 
 export function rowsForGraph(
@@ -79,6 +99,10 @@ export function resolveGraphViewPoints(
   const slice = capGraphViewRows(rows)
   if (slice.length === 0) return []
 
+  if (cfg.chartKind === 'histogram') {
+    return buildChartPoints(slice, cfg, slice.length)
+  }
+
   if (graphPlan.coordinateSystem === 'polar') {
     return rowsToCartesianPoints(slice).map((p, i) => ({
       ...p,
@@ -86,7 +110,7 @@ export function resolveGraphViewPoints(
     }))
   }
 
-  return buildChartPoints(slice, cfg, slice.length)
+  return buildChartPoints(slice, cfg, slice.length, graphPlan.bounds)
 }
 
 export { isAllAtOnceDisplay }

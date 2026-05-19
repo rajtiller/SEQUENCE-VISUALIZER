@@ -405,6 +405,14 @@ function App() {
                 pointRadius={cfg.pointRadius}
                 bounds={graphPlan.bounds}
                 useGraphBounds={!isPolar}
+                histogramSource={cfg.histogramSource}
+                histogramValueLabel={
+                  isPolar
+                    ? cfg.histogramSource === 'x'
+                      ? 'radius'
+                      : 'θ'
+                    : cfg.histogramSource
+                }
               />
             )}
           </div>
@@ -425,38 +433,60 @@ function App() {
                   <option value="line">Line</option>
                   <option value="scatter">Scatter</option>
                   <option value="bar">Bar</option>
+                  <option value="histogram">Histogram</option>
                 </select>
               </label>
-              <label className="field">
-                <span>Line</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={6}
-                  value={cfg.strokeWidth}
-                  onChange={(e) =>
-                    setCfg((c) => ({
-                      ...c,
-                      strokeWidth: Number(e.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Points</span>
-                <input
-                  type="range"
-                  min={2}
-                  max={12}
-                  value={cfg.pointRadius}
-                  onChange={(e) =>
-                    setCfg((c) => ({
-                      ...c,
-                      pointRadius: Number(e.target.value),
-                    }))
-                  }
-                />
-              </label>
+              {cfg.chartKind === 'histogram' && (
+                <label className="field">
+                  <span>Bin data</span>
+                  <select
+                    value={cfg.histogramSource}
+                    onChange={(e) =>
+                      setCfg((c) => ({
+                        ...c,
+                        histogramSource: e.target.value as VizConfig['histogramSource'],
+                      }))
+                    }
+                  >
+                    <option value="x">{isPolar ? 'Radius (x)' : 'X'}</option>
+                    <option value="y">{isPolar ? 'Angle θ (y)' : 'Y'}</option>
+                  </select>
+                </label>
+              )}
+              {cfg.chartKind !== 'histogram' && (
+                <>
+                  <label className="field">
+                    <span>Line</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={6}
+                      value={cfg.strokeWidth}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          strokeWidth: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Points</span>
+                    <input
+                      type="range"
+                      min={2}
+                      max={12}
+                      value={cfg.pointRadius}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          pointRadius: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                </>
+              )}
             </div>
           )}
 

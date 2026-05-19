@@ -1,9 +1,13 @@
-export type ChartKind = 'line' | 'scatter' | 'bar'
+export type ChartKind = 'line' | 'scatter' | 'bar' | 'histogram'
+
+/** Which column / list to bin when `chartKind` is `histogram`. */
+export type HistogramSource = 'x' | 'y'
 
 export type VizConfig = {
   chartKind: ChartKind
   strokeWidth: number
   pointRadius: number
+  histogramSource: HistogramSource
 }
 
 export const MIN_STROKE_WIDTH = 1
@@ -13,9 +17,11 @@ export const defaultVizConfig = (): VizConfig => ({
   chartKind: 'line',
   strokeWidth: MIN_STROKE_WIDTH,
   pointRadius: MIN_POINT_RADIUS,
+  histogramSource: 'y',
 })
 
-const CHART_KINDS: ChartKind[] = ['line', 'scatter', 'bar']
+const CHART_KINDS: ChartKind[] = ['line', 'scatter', 'bar', 'histogram']
+const HISTOGRAM_SOURCES: HistogramSource[] = ['x', 'y']
 
 export function normalizeVizConfig(
   value: Partial<VizConfig> | null | undefined,
@@ -27,6 +33,12 @@ export function normalizeVizConfig(
     ? (value.chartKind as ChartKind)
     : defaults.chartKind
 
+  const histogramSource = HISTOGRAM_SOURCES.includes(
+    value.histogramSource as HistogramSource,
+  )
+    ? (value.histogramSource as HistogramSource)
+    : defaults.histogramSource
+
   const strokeWidth = Number.isFinite(value.strokeWidth)
     ? Math.max(MIN_STROKE_WIDTH, value.strokeWidth!)
     : defaults.strokeWidth
@@ -35,5 +47,5 @@ export function normalizeVizConfig(
     ? Math.max(MIN_POINT_RADIUS, value.pointRadius!)
     : defaults.pointRadius
 
-  return { chartKind, strokeWidth, pointRadius }
+  return { chartKind, strokeWidth, pointRadius, histogramSource }
 }

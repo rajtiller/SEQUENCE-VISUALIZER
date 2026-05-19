@@ -48,6 +48,16 @@ export async function prepareGraphRenderData(
 
   const allPoints: ChartPoint[] = []
 
+  if (vizConfig.chartKind === 'histogram') {
+    onProgress(0.2, 'Building histogram…')
+    await yieldToMain()
+    allPoints.push(
+      ...buildChartPoints(graphRows, vizConfig, graphRows.length, graphPlan.bounds),
+    )
+    onProgress(1, 'Ready')
+    return { allPoints, graphRows }
+  }
+
   if (isPolar) {
     for (let i = 0; i < n; i += PROCESS_CHUNK) {
       const slice = graphRows.slice(i, i + PROCESS_CHUNK)
@@ -66,7 +76,9 @@ export async function prepareGraphRenderData(
   } else {
     for (let i = 0; i < n; i += PROCESS_CHUNK) {
       const slice = graphRows.slice(i, i + PROCESS_CHUNK)
-      allPoints.push(...buildChartPoints(slice, vizConfig, slice.length))
+      allPoints.push(
+        ...buildChartPoints(slice, vizConfig, slice.length, graphPlan.bounds),
+      )
       const done = Math.min(i + slice.length, n)
       onProgress(
         (done / n) * 0.95,
@@ -93,6 +105,18 @@ function prepareGraphRenderDataSync(
     return { allPoints: [], graphRows }
   }
 
+  if (vizConfig.chartKind === 'histogram') {
+    return {
+      allPoints: buildChartPoints(
+        graphRows,
+        vizConfig,
+        graphRows.length,
+        graphPlan.bounds,
+      ),
+      graphRows,
+    }
+  }
+
   if (isPolar) {
     return {
       allPoints: rowsToCartesianPoints(graphRows).map((p, i) => ({
@@ -104,7 +128,12 @@ function prepareGraphRenderDataSync(
   }
 
   return {
-    allPoints: buildChartPoints(graphRows, vizConfig, graphRows.length),
+    allPoints: buildChartPoints(
+      graphRows,
+      vizConfig,
+      graphRows.length,
+      graphPlan.bounds,
+    ),
     graphRows,
   }
 }
