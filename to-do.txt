@@ -4,3 +4,5 @@ allow multiple graphs to be on the same plot
 add/implement bar chart, where we can see how manys x's have a given y
 allow pixels to change color
 implement a database which allows you to save certain graphs
+allow more points to be plotted
+perhaps allow x and y to be intercahngeable and even allow a column to be used for multiple things. for example, if we want the line graph to slowly change color as it goes along, we couold use its x to achieve this

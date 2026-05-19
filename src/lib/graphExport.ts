@@ -1,6 +1,6 @@
 import type { CoordinateRow } from './parseCsv'
 import type { GraphPlanConfig } from './graphPlanConfig'
-import type { VizConfig } from './vizConfig'
+import { normalizeVizConfig, type VizConfig } from './vizConfig'
 import { yieldToMain } from './yieldToMain'
 
 export type GraphExportPayload = {
@@ -8,6 +8,13 @@ export type GraphExportPayload = {
   graphPlan: GraphPlanConfig
   vizConfig: VizConfig
   fileName?: string | null
+}
+
+function normalizePayload(payload: GraphExportPayload): GraphExportPayload {
+  return {
+    ...payload,
+    vizConfig: normalizeVizConfig(payload.vizConfig),
+  }
 }
 
 const STORAGE_KEY = 'sequence-viz-graph-export'
@@ -130,7 +137,7 @@ export function loadGraphExport(): GraphExportPayload | null {
   const legacy = s.getItem(STORAGE_KEY)
   if (legacy) {
     try {
-      return JSON.parse(legacy) as GraphExportPayload
+      return normalizePayload(JSON.parse(legacy) as GraphExportPayload)
     } catch {
       return null
     }
@@ -157,12 +164,12 @@ export function loadGraphExport(): GraphExportPayload | null {
       coordinateRows.push(...(JSON.parse(chunkRaw) as CoordinateRow[]))
     }
 
-    return {
+    return normalizePayload({
       coordinateRows,
       graphPlan: meta.graphPlan,
       vizConfig: meta.vizConfig,
       fileName: meta.fileName,
-    }
+    })
   } catch {
     return null
   }
@@ -177,7 +184,7 @@ export async function loadGraphExportAsync(
     onProgress?.(0.2, 'Loading graph data…')
     await yieldToMain()
     try {
-      const payload = JSON.parse(legacy) as GraphExportPayload
+      const payload = normalizePayload(JSON.parse(legacy) as GraphExportPayload)
       onProgress?.(1, 'Loaded')
       return payload
     } catch {
@@ -213,12 +220,12 @@ export async function loadGraphExportAsync(
     }
 
     onProgress?.(0.5, 'Loaded')
-    return {
+    return normalizePayload({
       coordinateRows,
       graphPlan: meta.graphPlan,
       vizConfig: meta.vizConfig,
       fileName: meta.fileName,
-    }
+    })
   } catch {
     return null
   }

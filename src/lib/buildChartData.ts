@@ -4,6 +4,9 @@ import { isAllAtOnceDisplay, type GraphPlanConfig } from './graphPlanConfig'
 import { rowsToCartesianPoints } from './polarGrid'
 import type { VizConfig } from './vizConfig'
 
+/** Max points drawn in the full-screen graph (preview uses `graphPlan.pointCount`). */
+export const MAX_GRAPH_VIEW_POINTS = 50_000
+
 export function buildChartPoints(
   rows: CoordinateRow[],
   cfg: VizConfig,
@@ -60,6 +63,30 @@ export function rowsForGraph(
     Math.min(graphPlan.pointCount, 20_000, rows.length),
   )
   return rows.slice(0, cap)
+}
+
+export function capGraphViewRows(rows: CoordinateRow[]): CoordinateRow[] {
+  if (rows.length <= MAX_GRAPH_VIEW_POINTS) return rows
+  return rows.slice(0, MAX_GRAPH_VIEW_POINTS)
+}
+
+/** Full-screen graph: use all loaded rows (up to cap), not preview `pointCount`. */
+export function resolveGraphViewPoints(
+  rows: CoordinateRow[],
+  graphPlan: GraphPlanConfig,
+  cfg: VizConfig,
+): ChartPoint[] {
+  const slice = capGraphViewRows(rows)
+  if (slice.length === 0) return []
+
+  if (graphPlan.coordinateSystem === 'polar') {
+    return rowsToCartesianPoints(slice).map((p, i) => ({
+      ...p,
+      label: String(slice[i].x),
+    }))
+  }
+
+  return buildChartPoints(slice, cfg, slice.length)
 }
 
 export { isAllAtOnceDisplay }

@@ -4,11 +4,12 @@ import { buildFilledCellsAsync } from './pixelGrid'
 import type { CoordinateRow } from './parseCsv'
 import {
   buildChartPoints,
-  rowsForGraph,
+  capGraphViewRows,
 } from './buildChartData'
 import type { GraphExportPayload } from './graphExport'
 import { shouldShowGraphProgress } from './graphExport'
 import { rowsToCartesianPoints } from './polarGrid'
+import { normalizeVizConfig } from './vizConfig'
 import { yieldToMain } from './yieldToMain'
 
 export type PreparedGraphRender = {
@@ -25,8 +26,9 @@ export async function prepareGraphRenderData(
   payload: GraphExportPayload,
   onProgress: ProgressCallback,
 ): Promise<PreparedGraphRender> {
-  const { coordinateRows, graphPlan, vizConfig } = payload
-  const graphRows = rowsForGraph(coordinateRows, graphPlan)
+  const { coordinateRows, graphPlan } = payload
+  const vizConfig = normalizeVizConfig(payload.vizConfig)
+  const graphRows = capGraphViewRows(coordinateRows)
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
   const n = graphRows.length
@@ -82,7 +84,8 @@ function prepareGraphRenderDataSync(
   payload: GraphExportPayload,
   graphRows: CoordinateRow[],
 ): PreparedGraphRender {
-  const { graphPlan, vizConfig } = payload
+  const { graphPlan } = payload
+  const vizConfig = normalizeVizConfig(payload.vizConfig)
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
 

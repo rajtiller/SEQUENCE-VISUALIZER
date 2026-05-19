@@ -14,3 +14,26 @@ export const defaultVizConfig = (): VizConfig => ({
   strokeWidth: MIN_STROKE_WIDTH,
   pointRadius: MIN_POINT_RADIUS,
 })
+
+const CHART_KINDS: ChartKind[] = ['line', 'scatter', 'bar']
+
+export function normalizeVizConfig(
+  value: Partial<VizConfig> | null | undefined,
+): VizConfig {
+  const defaults = defaultVizConfig()
+  if (!value) return defaults
+
+  const chartKind = CHART_KINDS.includes(value.chartKind as ChartKind)
+    ? (value.chartKind as ChartKind)
+    : defaults.chartKind
+
+  const strokeWidth = Number.isFinite(value.strokeWidth)
+    ? Math.max(MIN_STROKE_WIDTH, value.strokeWidth!)
+    : defaults.strokeWidth
+
+  const pointRadius = Number.isFinite(value.pointRadius)
+    ? Math.max(MIN_POINT_RADIUS, value.pointRadius!)
+    : defaults.pointRadius
+
+  return { chartKind, strokeWidth, pointRadius }
+}

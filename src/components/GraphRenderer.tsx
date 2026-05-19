@@ -4,10 +4,12 @@ import { PixelGridChart } from './PixelGridChart'
 import type { GraphExportPayload } from '../lib/graphExport'
 import type { PreparedGraphRender } from '../lib/prepareGraphRender'
 import {
+  capGraphViewRows,
   isAllAtOnceDisplay,
-  resolveChartPoints,
-  rowsForGraph,
+  resolveGraphViewPoints,
 } from '../lib/buildChartData'
+import { normalizeGraphBounds } from '../lib/graphPlanConfig'
+import { normalizeVizConfig } from '../lib/vizConfig'
 
 type Props = {
   payload: GraphExportPayload
@@ -17,20 +19,25 @@ type Props = {
 }
 
 export function GraphRenderer({ payload, width, height, prepared }: Props) {
-  const { coordinateRows, graphPlan, vizConfig } = payload
+  const { coordinateRows, graphPlan } = payload
+  const vizConfig = normalizeVizConfig(payload.vizConfig)
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
   const showGrid = graphPlan.gridLines === 'yes'
+  const bounds = normalizeGraphBounds(
+    graphPlan.bounds,
+    graphPlan.coordinateSystem,
+  )
 
   const allPoints = useMemo(() => {
     if (prepared) return prepared.allPoints
-    return resolveChartPoints(coordinateRows, graphPlan, vizConfig)
+    return resolveGraphViewPoints(coordinateRows, graphPlan, vizConfig)
   }, [prepared, coordinateRows, graphPlan, vizConfig])
 
   const graphRows = useMemo(() => {
     if (prepared) return prepared.graphRows
-    return rowsForGraph(coordinateRows, graphPlan)
-  }, [prepared, coordinateRows, graphPlan])
+    return capGraphViewRows(coordinateRows)
+  }, [prepared, coordinateRows])
 
   const animate = !isAllAtOnceDisplay(graphPlan.pointsPerSecond)
   const [visibleCount, setVisibleCount] = useState(() =>
@@ -60,6 +67,12 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
     return () => window.clearInterval(id)
   }, [animate, allPoints.length, graphPlan.pointsPerSecond])
 
+  useEffect(() => {
+    if (!animate) {
+      setVisibleCount(allPoints.length)
+    }
+  }, [animate, allPoints])
+
   const points: ChartPoint[] = useMemo(
     () => allPoints.slice(0, visibleCount),
     [allPoints, visibleCount],
@@ -69,7 +82,7 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
     return (
       <PixelGridChart
         rows={graphRows}
-        bounds={graphPlan.bounds}
+        bounds={bounds}
         showGrid={showGrid}
         width={width}
         height={height}
@@ -87,6 +100,8 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
       pointRadius={vizConfig.pointRadius}
       width={width}
       height={height}
+      bounds={bounds}
+      useGraphBounds={!isPolar}
     />
   )
 }

@@ -1,4 +1,5 @@
 import type { ChartKind } from '../lib/vizConfig'
+import type { GraphBounds } from '../lib/graphPlanConfig'
 
 export type ChartPoint = { x: number; y: number; z?: number; label: string }
 
@@ -10,6 +11,9 @@ type Props = {
   pointRadius: number
   width?: number
   height?: number
+  /** When set (rectangular plots), map data into these axis limits. */
+  bounds?: GraphBounds
+  useGraphBounds?: boolean
 }
 
 const DEFAULT_W = 560
@@ -24,19 +28,47 @@ function chartPad(w: number, h: number) {
   }
 }
 
-function scaleDomain(
+function extent(
   values: number[],
   flatFallback = 1,
 ): { min: number; max: number } {
   if (values.length === 0) return { min: 0, max: 1 }
-  let min = Math.min(...values)
-  let max = Math.max(...values)
+  let min = Infinity
+  let max = -Infinity
+  for (const v of values) {
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return { min: 0, max: 1 }
+  }
   if (min === max) {
     min -= flatFallback
     max += flatFallback
   }
   const span = max - min
   return { min: min - span * 0.04, max: max + span * 0.04 }
+}
+
+function domainFromBounds(bounds: GraphBounds | undefined): {
+  xMin: number
+  xMax: number
+  yMin: number
+  yMax: number
+} | null {
+  if (!bounds) return null
+  const { xMin, xMax, yMin, yMax } = bounds
+  if (
+    !Number.isFinite(xMin) ||
+    !Number.isFinite(xMax) ||
+    !Number.isFinite(yMin) ||
+    !Number.isFinite(yMax) ||
+    xMax <= xMin ||
+    yMax <= yMin
+  ) {
+    return null
+  }
+  return { xMin, xMax, yMin, yMax }
 }
 
 export function DataChart({
@@ -47,6 +79,8 @@ export function DataChart({
   pointRadius,
   width = DEFAULT_W,
   height = DEFAULT_H,
+  bounds,
+  useGraphBounds = false,
 }: Props) {
   const W = width
   const H = height
@@ -73,20 +107,26 @@ export function DataChart({
           fill="var(--text)"
           fontSize="14"
         >
-          Choose columns with numeric values to see a chart
+          No points to plot
         </text>
       </svg>
     )
   }
 
+  const boundDomain = useGraphBounds ? domainFromBounds(bounds) : null
+  const xs = points.map((p) => p.x)
   const ys = points.map((p) => p.y)
-  const { min: yMin, max: yMax } = scaleDomain(ys)
+  const xExtent = boundDomain
+    ? { min: boundDomain.xMin, max: boundDomain.xMax }
+    : extent(xs)
+  const yExtent = boundDomain
+    ? { min: boundDomain.yMin, max: boundDomain.yMax }
+    : extent(ys)
+  const { min: xMin, max: xMax } = xExtent
+  const { min: yMin, max: yMax } = yExtent
 
-  const sxNumeric = (() => {
-    const xs = points.map((p) => p.x)
-    const { min: xMin, max: xMax } = scaleDomain(xs)
-    return (x: number) => pad.l + ((x - xMin) / (xMax - xMin)) * innerW
-  })()
+  const sxNumeric = (x: number) =>
+    pad.l + ((x - xMin) / (xMax - xMin)) * innerW
 
   const sxBar = (index: number) => {
     const n = points.length
@@ -94,7 +134,8 @@ export function DataChart({
     return pad.l + slot * (index + 0.5)
   }
 
-  const sy = (y: number) => pad.t + innerH - ((y - yMin) / (yMax - yMin)) * innerH
+  const sy = (y: number) =>
+    pad.t + innerH - ((y - yMin) / (yMax - yMin)) * innerH
 
   const linePath =
     kind === 'line'
@@ -185,7 +226,7 @@ export function DataChart({
             cy={sy(p.y)}
             r={pointRadius}
             fill="var(--accent)"
-            stroke="var(--bg)"
+            stroke="var(--chart-bg)"
             strokeWidth="1"
           />
         ))}
@@ -196,14 +237,14 @@ export function DataChart({
           const y0 = sy(yMin)
           const y1 = sy(p.y)
           const top = Math.min(y0, y1)
-          const height = Math.abs(y1 - y0)
+          const barHeight = Math.abs(y1 - y0)
           return (
             <rect
               key={i}
               x={cx - barWidth / 2}
               y={top}
               width={barWidth}
-              height={Math.max(height, 1)}
+              height={Math.max(barHeight, 1)}
               fill="var(--accent)"
               opacity={0.85}
             />

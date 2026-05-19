@@ -257,6 +257,8 @@ function App() {
                 showGrid={showGrid}
                 strokeWidth={cfg.strokeWidth}
                 pointRadius={cfg.pointRadius}
+                bounds={graphPlan.bounds}
+                useGraphBounds={!isPolar}
               />
             )}
           </div>
