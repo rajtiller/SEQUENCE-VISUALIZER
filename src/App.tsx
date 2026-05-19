@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type DragEvent } from 'react'
 import { DataChart } from './components/DataChart'
+import { DeferredNumberInput } from './components/DeferredNumberInput'
 import { ListFileInput } from './components/ListFileInput'
 import { PixelGridChart } from './components/PixelGridChart'
 import type { CoordinateRow } from './lib/parseCsv'
@@ -28,7 +29,11 @@ import {
   shouldShowGraphProgress,
 } from './lib/graphExport'
 import { ProgressBar } from './components/ProgressBar'
-import { defaultVizConfig, type VizConfig } from './lib/vizConfig'
+import {
+  DEFAULT_HISTOGRAM_INTERVAL,
+  defaultVizConfig,
+  type VizConfig,
+} from './lib/vizConfig'
 import './App.css'
 
 const PREVIEW_ROW_COUNT = 4
@@ -258,15 +263,11 @@ function App() {
   const showRectPixels = graphPlan.usePixels && !isPolar
   const showGrid = graphPlan.gridLines === 'yes'
 
-  const setBound = useCallback((key: keyof GraphBounds, raw: string) => {
-    const n = Number.parseFloat(raw)
+  const commitBound = useCallback((key: keyof GraphBounds, n: number) => {
     setGraphPlan((p) => ({
       ...p,
       bounds: normalizeGraphBounds(
-        {
-          ...p.bounds,
-          [key]: Number.isFinite(n) ? n : p.bounds[key],
-        },
+        { ...p.bounds, [key]: n },
         p.coordinateSystem,
       ),
     }))
@@ -458,21 +459,16 @@ function App() {
               {cfg.chartKind === 'histogram' && (
                 <label className="field">
                   <span>Interval</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="any"
+                  <DeferredNumberInput
                     value={cfg.histogramInterval}
-                    onChange={(e) => {
-                      const n = Number.parseFloat(e.target.value)
+                    min={0}
+                    onCommit={(n) =>
                       setCfg((c) => ({
                         ...c,
                         histogramInterval:
-                          Number.isFinite(n) && n > 0
-                            ? n
-                            : c.histogramInterval,
+                          n > 0 ? n : DEFAULT_HISTOGRAM_INTERVAL,
                       }))
-                    }}
+                    }
                   />
                 </label>
               )}
@@ -539,29 +535,17 @@ function App() {
 
               <label className="field">
                 <span>Points / sec</span>
-                <input
-                  type="number"
+                <DeferredNumberInput
+                  optional
+                  placeholder="all at once"
+                  value={graphPlan.pointsPerSecond}
                   min={0}
-                  step="any"
-                  placeholder="leave blank for all at once"
-                  value={
-                    graphPlan.pointsPerSecond == null
-                      ? ''
-                      : graphPlan.pointsPerSecond
-                  }
-                  onChange={(e) => {
-                    const raw = e.target.value.trim()
-                    if (raw === '') {
-                      setGraphPlan((p) => ({ ...p, pointsPerSecond: null }))
-                      return
-                    }
-                    const n = Number.parseFloat(raw)
+                  onCommit={(n) =>
                     setGraphPlan((p) => ({
                       ...p,
-                      pointsPerSecond:
-                        Number.isFinite(n) && n > 0 ? n : null,
+                      pointsPerSecond: n != null && n > 0 ? n : null,
                     }))
-                  }}
+                  }
                 />
               </label>
 
@@ -585,27 +569,18 @@ function App() {
 
               <label className="field">
                 <span>First n points</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
+                <DeferredNumberInput
+                  optional
+                  integer
                   placeholder="all"
-                  value={
-                    graphPlan.pointCount == null ? '' : graphPlan.pointCount
-                  }
-                  onChange={(e) => {
-                    const raw = e.target.value.trim()
-                    if (raw === '') {
-                      setGraphPlan((p) => ({ ...p, pointCount: null }))
-                      return
-                    }
-                    const n = Number.parseInt(raw, 10)
+                  value={graphPlan.pointCount}
+                  min={1}
+                  onCommit={(n) =>
                     setGraphPlan((p) => ({
                       ...p,
-                      pointCount:
-                        Number.isFinite(n) && n > 0 ? n : p.pointCount,
+                      pointCount: n != null && n > 0 ? Math.floor(n) : null,
                     }))
-                  }}
+                  }
                 />
               </label>
 
@@ -671,44 +646,36 @@ function App() {
                   <span className="metric-label">
                     {isPolar ? 'R min' : 'X min'}
                   </span>
-                  <input
-                    type="number"
-                    step="any"
+                  <DeferredNumberInput
                     value={graphPlan.bounds.xMin}
-                    onChange={(e) => setBound('xMin', e.target.value)}
+                    onCommit={(n) => commitBound('xMin', n)}
                   />
                 </label>
                 <label className="metric">
                   <span className="metric-label">
                     {isPolar ? 'R max' : 'X max'}
                   </span>
-                  <input
-                    type="number"
-                    step="any"
+                  <DeferredNumberInput
                     value={graphPlan.bounds.xMax}
-                    onChange={(e) => setBound('xMax', e.target.value)}
+                    onCommit={(n) => commitBound('xMax', n)}
                   />
                 </label>
                 <label className="metric">
                   <span className="metric-label">
                     {isPolar ? 'θ min' : 'Y min'}
                   </span>
-                  <input
-                    type="number"
-                    step="any"
+                  <DeferredNumberInput
                     value={graphPlan.bounds.yMin}
-                    onChange={(e) => setBound('yMin', e.target.value)}
+                    onCommit={(n) => commitBound('yMin', n)}
                   />
                 </label>
                 <label className="metric">
                   <span className="metric-label">
                     {isPolar ? 'θ max' : 'Y max'}
                   </span>
-                  <input
-                    type="number"
-                    step="any"
+                  <DeferredNumberInput
                     value={graphPlan.bounds.yMax}
-                    onChange={(e) => setBound('yMax', e.target.value)}
+                    onCommit={(n) => commitBound('yMax', n)}
                   />
                 </label>
               </div>
