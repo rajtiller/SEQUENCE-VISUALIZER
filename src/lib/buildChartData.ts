@@ -23,12 +23,13 @@ export function buildChartPoints(
 
   if (cfg.chartKind === 'histogram') {
     const domain =
-      bounds && bounds.xMax > bounds.xMin && bounds.yMax > bounds.yMin
-        ? cfg.histogramSource === 'x'
-          ? { domainMin: bounds.xMin, domainMax: bounds.xMax }
-          : { domainMin: bounds.yMin, domainMax: bounds.yMax }
+      bounds && bounds.xMax > bounds.xMin
+        ? { domainMin: bounds.xMin, domainMax: bounds.xMax }
         : undefined
-    return buildHistogramChartPoints(slice, cfg.histogramSource, domain)
+    return buildHistogramChartPoints(slice, cfg.histogramSource, {
+      interval: cfg.histogramInterval,
+      ...domain,
+    })
   }
 
   if (cfg.chartKind === 'bar') {

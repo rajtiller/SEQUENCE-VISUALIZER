@@ -405,14 +405,6 @@ function App() {
                 pointRadius={cfg.pointRadius}
                 bounds={graphPlan.bounds}
                 useGraphBounds={!isPolar}
-                histogramSource={cfg.histogramSource}
-                histogramValueLabel={
-                  isPolar
-                    ? cfg.histogramSource === 'x'
-                      ? 'radius'
-                      : 'θ'
-                    : cfg.histogramSource
-                }
               />
             )}
           </div>
@@ -451,6 +443,27 @@ function App() {
                     <option value="x">{isPolar ? 'Radius (x)' : 'X'}</option>
                     <option value="y">{isPolar ? 'Angle θ (y)' : 'Y'}</option>
                   </select>
+                </label>
+              )}
+              {cfg.chartKind === 'histogram' && (
+                <label className="field">
+                  <span>Interval</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={cfg.histogramInterval}
+                    onChange={(e) => {
+                      const n = Number.parseFloat(e.target.value)
+                      setCfg((c) => ({
+                        ...c,
+                        histogramInterval:
+                          Number.isFinite(n) && n > 0
+                            ? n
+                            : c.histogramInterval,
+                      }))
+                    }}
+                  />
                 </label>
               )}
               {cfg.chartKind !== 'histogram' && (

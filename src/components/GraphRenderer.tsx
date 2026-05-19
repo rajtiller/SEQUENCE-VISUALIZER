@@ -91,12 +91,6 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
     )
   }
 
-  const histLabel = isPolar
-    ? vizConfig.histogramSource === 'x'
-      ? 'radius'
-      : 'θ'
-    : vizConfig.histogramSource
-
   return (
     <DataChart
       points={points}
@@ -108,8 +102,6 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
       height={height}
       bounds={bounds}
       useGraphBounds={!isPolar}
-      histogramSource={vizConfig.histogramSource}
-      histogramValueLabel={histLabel}
     />
   )
 }

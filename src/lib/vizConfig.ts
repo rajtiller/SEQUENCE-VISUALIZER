@@ -8,16 +8,21 @@ export type VizConfig = {
   strokeWidth: number
   pointRadius: number
   histogramSource: HistogramSource
+  /** Width of each histogram bin on the value axis. */
+  histogramInterval: number
 }
 
 export const MIN_STROKE_WIDTH = 1
 export const MIN_POINT_RADIUS = 2
+export const MIN_HISTOGRAM_INTERVAL = 1e-9
+export const DEFAULT_HISTOGRAM_INTERVAL = 1
 
 export const defaultVizConfig = (): VizConfig => ({
   chartKind: 'line',
   strokeWidth: MIN_STROKE_WIDTH,
   pointRadius: MIN_POINT_RADIUS,
   histogramSource: 'y',
+  histogramInterval: DEFAULT_HISTOGRAM_INTERVAL,
 })
 
 const CHART_KINDS: ChartKind[] = ['line', 'scatter', 'bar', 'histogram']
@@ -47,5 +52,15 @@ export function normalizeVizConfig(
     ? Math.max(MIN_POINT_RADIUS, value.pointRadius!)
     : defaults.pointRadius
 
-  return { chartKind, strokeWidth, pointRadius, histogramSource }
+  const histogramInterval = Number.isFinite(value.histogramInterval)
+    ? Math.max(MIN_HISTOGRAM_INTERVAL, value.histogramInterval!)
+    : defaults.histogramInterval
+
+  return {
+    chartKind,
+    strokeWidth,
+    pointRadius,
+    histogramSource,
+    histogramInterval,
+  }
 }

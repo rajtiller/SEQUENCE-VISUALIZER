@@ -9,3 +9,4 @@ perhaps allow x and y to be intercahngeable and even allow a column to be used f
 fix the number boxes, its hard to type 100 without doing a round about way
 accept multiple data types and label
 add option to only use first n points of sample
+should i add numbers to certain things? is the beauty supposed to be purely visual, meaning there's some elegnace in only drawing and not writing?

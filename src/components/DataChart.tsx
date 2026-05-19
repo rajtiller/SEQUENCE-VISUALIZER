@@ -1,7 +1,15 @@
-import type { ChartKind, HistogramSource } from '../lib/vizConfig'
+import type { ChartKind } from '../lib/vizConfig'
 import type { GraphBounds } from '../lib/graphPlanConfig'
 
-export type ChartPoint = { x: number; y: number; z?: number; label: string }
+export type ChartPoint = {
+  x: number
+  y: number
+  z?: number
+  label: string
+  /** Histogram bin edges (value axis); bars render flush from start to end. */
+  binStart?: number
+  binEnd?: number
+}
 
 type Props = {
   points: ChartPoint[]
@@ -14,9 +22,6 @@ type Props = {
   /** When set (rectangular plots), map data into these axis limits. */
   bounds?: GraphBounds
   useGraphBounds?: boolean
-  /** Label for histogram value axis (e.g. "y" or "radius"). */
-  histogramValueLabel?: string
-  histogramSource?: HistogramSource
 }
 
 const DEFAULT_W = 560
@@ -84,8 +89,6 @@ export function DataChart({
   height = DEFAULT_H,
   bounds,
   useGraphBounds = false,
-  histogramValueLabel = 'value',
-  histogramSource = 'y',
 }: Props) {
   const W = width
   const H = height
@@ -119,23 +122,37 @@ export function DataChart({
   }
 
   const isHistogram = kind === 'histogram'
-  const boundDomain = useGraphBounds && !isHistogram ? domainFromBounds(bounds) : null
-  const boundX =
-    isHistogram && useGraphBounds && bounds
-      ? histogramSource === 'x'
-        ? { xMin: bounds.xMin, xMax: bounds.xMax, yMin: 0, yMax: 1 }
-        : { xMin: bounds.yMin, xMax: bounds.yMax, yMin: 0, yMax: 1 }
-      : null
-  const boundXExtent = boundX
-    ? { min: boundX.xMin, max: boundX.xMax }
-    : null
+  const chartBounds = useGraphBounds ? domainFromBounds(bounds) : null
+  const boundDomain = useGraphBounds && !isHistogram ? chartBounds : null
 
   const xs = points.map((p) => p.x)
   const ys = points.map((p) => p.y)
-  const xExtent = boundXExtent ?? extent(xs)
+
+  let xMin: number
+  let xMax: number
   let yMin: number
   let yMax: number
-  if (isHistogram) {
+
+  if (isHistogram && chartBounds) {
+    xMin = chartBounds.xMin
+    xMax = chartBounds.xMax
+    yMin = chartBounds.yMin
+    yMax = chartBounds.yMax
+  } else if (isHistogram) {
+    let binLo = Infinity
+    let binHi = -Infinity
+    for (const p of points) {
+      const lo = p.binStart ?? p.x
+      const hi = p.binEnd ?? p.x
+      if (lo < binLo) binLo = lo
+      if (hi > binHi) binHi = hi
+    }
+    const xExtent =
+      Number.isFinite(binLo) && Number.isFinite(binHi)
+        ? { min: binLo, max: binHi }
+        : extent(xs)
+    xMin = xExtent.min
+    xMax = xExtent.max
     yMin = 0
     let maxCount = 0
     for (const p of points) {
@@ -143,13 +160,17 @@ export function DataChart({
     }
     yMax = Math.max(1, maxCount * 1.08)
   } else {
+    const xExtent = boundDomain
+      ? { min: boundDomain.xMin, max: boundDomain.xMax }
+      : extent(xs)
     const yExtent = boundDomain
       ? { min: boundDomain.yMin, max: boundDomain.yMax }
       : extent(ys)
+    xMin = xExtent.min
+    xMax = xExtent.max
     yMin = yExtent.min
     yMax = yExtent.max
   }
-  const { min: xMin, max: xMax } = xExtent
 
   const sxNumeric = (x: number) =>
     pad.l + ((x - xMin) / (xMax - xMin)) * innerW
@@ -282,7 +303,12 @@ export function DataChart({
 
       {kind === 'histogram' &&
         points.map((p, i) => {
-          const cx = sxNumeric(p.x)
+          const binStart = p.binStart ?? p.x
+          const binEnd = p.binEnd ?? p.x
+          const x1 = sxNumeric(binStart)
+          const x2 = sxNumeric(binEnd)
+          const left = Math.min(x1, x2)
+          const flushWidth = Math.max(1, Math.abs(x2 - x1))
           const y0 = sy(yMin)
           const y1 = sy(p.y)
           const top = Math.min(y0, y1)
@@ -290,9 +316,9 @@ export function DataChart({
           return (
             <rect
               key={`h-${i}`}
-              x={cx - barWidth / 2}
+              x={left}
               y={top}
-              width={barWidth}
+              width={flushWidth}
               height={Math.max(barHeight, 1)}
               fill="var(--accent)"
               opacity={0.85}
@@ -307,10 +333,13 @@ export function DataChart({
           }
           const label =
             p.label.length > 12 ? `${p.label.slice(0, 11)}…` : p.label
+          const binStart = p.binStart ?? p.x
+          const binEnd = p.binEnd ?? p.x
+          const labelX = (sxNumeric(binStart) + sxNumeric(binEnd)) / 2
           return (
             <text
               key={`hlbl-${i}`}
-              x={sxNumeric(p.x)}
+              x={labelX}
               y={H - pad.b + 14}
               textAnchor="middle"
               fill="var(--text)"
@@ -351,7 +380,7 @@ export function DataChart({
         fontFamily="var(--mono)"
       >
         {kind === 'histogram'
-          ? `${histogramValueLabel} (bins)`
+          ? 'x axis'
           : kind === 'bar'
             ? `${points.length} categories`
             : 'x axis'}
@@ -363,7 +392,7 @@ export function DataChart({
         fontSize="11"
         fontFamily="var(--mono)"
       >
-        {kind === 'histogram' ? `count (max ${Math.round(yMax)})` : `y: ${yMax.toPrecision(4)}`}
+        {kind === 'histogram' ? `y: ${yMax.toPrecision(4)}` : `y: ${yMax.toPrecision(4)}`}
       </text>
     </svg>
   )

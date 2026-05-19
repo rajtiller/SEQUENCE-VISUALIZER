@@ -9,29 +9,28 @@ export type HistogramBin = {
   count: number
 }
 
-const MIN_BINS = 5
-const MAX_BINS = 48
+const MAX_BINS = 512
 
-export function chooseBinCount(valueCount: number): number {
-  if (valueCount <= 1) return 1
-  const sturges = Math.ceil(Math.log2(valueCount) + 1)
-  return Math.max(MIN_BINS, Math.min(MAX_BINS, sturges))
-}
-
+/**
+ * Tile [domainMin, domainMax] with fixed-width bins (flush, no gaps).
+ * Values outside the domain are ignored.
+ */
 export function computeHistogramBins(
   values: number[],
-  options?: {
-    binCount?: number
+  options: {
+    interval: number
     domainMin?: number
     domainMax?: number
   },
 ): HistogramBin[] {
-  if (values.length === 0) return []
+  const width = options.interval
+  if (!Number.isFinite(width) || width <= 0) return []
 
-  let min = options?.domainMin
-  let max = options?.domainMax
+  let min = options.domainMin
+  let max = options.domainMax
 
   if (min === undefined || max === undefined || max <= min) {
+    if (values.length === 0) return []
     min = Infinity
     max = -Infinity
     for (const v of values) {
@@ -40,32 +39,39 @@ export function computeHistogramBins(
     }
     if (!Number.isFinite(min) || !Number.isFinite(max)) return []
     if (min === max) {
-      min -= 0.5
-      max += 0.5
+      min -= width / 2
+      max += width / 2
     }
   }
 
-  const k = options?.binCount ?? chooseBinCount(values.length)
-  const width = (max - min) / k
-  const counts = new Array<number>(k).fill(0)
-
-  for (const v of values) {
-    let idx = Math.floor((v - min) / width)
-    if (idx < 0) idx = 0
-    if (idx >= k) idx = k - 1
-    counts[idx] += 1
+  const bins: HistogramBin[] = []
+  for (let s = min; s < max; s += width) {
+    if (bins.length >= MAX_BINS) break
+    const binEnd = Math.min(s + width, max)
+    bins.push({
+      start: s,
+      end: binEnd,
+      center: (s + binEnd) / 2,
+      count: 0,
+    })
+    if (binEnd >= max) break
   }
 
-  const bins: HistogramBin[] = []
-  for (let i = 0; i < k; i += 1) {
-    const start = min + i * width
-    const end = i === k - 1 ? max : min + (i + 1) * width
+  if (bins.length === 0) {
     bins.push({
-      start,
-      end,
-      center: (start + end) / 2,
-      count: counts[i],
+      start: min,
+      end: max,
+      center: (min + max) / 2,
+      count: 0,
     })
+  }
+
+  for (const v of values) {
+    if (v < min || v > max) continue
+    let idx = Math.floor((v - min) / width)
+    if (idx < 0) idx = 0
+    if (idx >= bins.length) idx = bins.length - 1
+    bins[idx].count += 1
   }
 
   return bins
@@ -74,10 +80,11 @@ export function computeHistogramBins(
 export function buildHistogramChartPoints(
   rows: CoordinateRow[],
   source: HistogramSource,
-  options?: {
+  options: {
+    interval: number
+    /** Chart horizontal axis (graph X min / max). */
     domainMin?: number
     domainMax?: number
-    binCount?: number
   },
 ): ChartPoint[] {
   const values = rows.map((r) => (source === 'x' ? r.x : r.y))
@@ -86,6 +93,8 @@ export function buildHistogramChartPoints(
     x: b.center,
     y: b.count,
     label: formatBinLabel(b.start, b.end),
+    binStart: b.start,
+    binEnd: b.end,
   }))
 }
 
