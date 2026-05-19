@@ -18,6 +18,8 @@ import { rowsToCartesianPoints } from './lib/polarGrid'
 import { defaultVizConfig, type VizConfig } from './lib/vizConfig'
 import './App.css'
 
+const PREVIEW_ROW_COUNT = 4
+
 function buildChartPoints(
   rows: CoordinateRow[],
   cfg: VizConfig,
@@ -141,12 +143,13 @@ function App() {
   }, [rowsForChart, graphPlan.coordinateSystem, cfg])
 
   const previewRows = useMemo(
-    () => coordinateRows.slice(0, 12),
+    () => coordinateRows.slice(0, PREVIEW_ROW_COUNT),
     [coordinateRows],
   )
 
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
+  const showGrid = graphPlan.gridLines === 'yes'
 
   const setBound = useCallback((key: keyof GraphBounds, raw: string) => {
     const n = Number.parseFloat(raw)
@@ -164,21 +167,21 @@ function App() {
 
   return (
     <div className="viz-app">
-      <header className="viz-header">
+      <header className="viz-header-compact">
         <h1>CSV visualizer</h1>
-        <p className="viz-lead">
+        <p className="viz-tagline">
           {isPolar
-            ? 'Each line: x = radius, y = angle in radians (from +x). Optional z. Comma- or space-separated.'
-            : 'Each line: x, y, and optional z. Comma- or space-separated.'}
+            ? 'x = radius, y = angle (rad)'
+            : 'x, y per line · optional z'}
         </p>
       </header>
 
-      <div className="viz-layout">
-        <section className="viz-panel" aria-labelledby="data-heading">
+      <div className="viz-shell">
+        <aside className="viz-data" aria-labelledby="data-heading">
           <h2 id="data-heading">Data</h2>
 
           <label
-            className="file-drop"
+            className="file-drop-compact"
             onDrop={onDrop}
             onDragOver={onDragOver}
           >
@@ -188,18 +191,18 @@ function App() {
               className="sr-only"
               onChange={(e) => onFile(e.target.files?.[0] ?? null)}
             />
-            <span className="file-drop-title">
-              {fileName ? fileName : 'Choose a CSV file'}
-            </span>
-            <span className="file-drop-hint">or drop a file (click to browse)</span>
+            <strong>{fileName ?? 'Choose CSV'}</strong>
+            {fileName ? '' : ' — click or drop'}
           </label>
 
           {parseError && <p className="viz-error">{parseError}</p>}
 
           {coordinateRows.length > 0 && (
             <p className="viz-meta">
-              {coordinateRows.length} point{coordinateRows.length === 1 ? '' : 's'}
-              {hasZ ? ' · includes z' : ''}
+              {coordinateRows.length} pts{hasZ ? ' · z' : ''}
+              {coordinateRows.length > PREVIEW_ROW_COUNT
+                ? ` · first ${PREVIEW_ROW_COUNT} below`
+                : ''}
             </p>
           )}
 
@@ -209,7 +212,7 @@ function App() {
                 <thead>
                   <tr>
                     <th>{isPolar ? 'r' : 'x'}</th>
-                    <th>{isPolar ? 'θ (rad)' : 'y'}</th>
+                    <th>{isPolar ? 'θ' : 'y'}</th>
                     {hasZ && <th>z</th>}
                   </tr>
                 </thead>
@@ -223,25 +226,35 @@ function App() {
                   ))}
                 </tbody>
               </table>
-              {coordinateRows.length > previewRows.length && (
-                <p className="table-note">
-                  Showing first {previewRows.length} rows of{' '}
-                  {coordinateRows.length}.
-                </p>
-              )}
             </div>
           )}
-        </section>
+        </aside>
 
-        <section className="viz-panel" aria-labelledby="settings-heading">
-          <h2 id="settings-heading">Visualization</h2>
+        <div className="viz-main" aria-labelledby="viz-heading">
+          <h2 id="viz-heading">Visualization</h2>
 
-          <div className="plan-section">
-            <h3 className="plan-section-title">Preview</h3>
-            {!showRectPixels && (
-            <div className="field-grid">
+          <div className="chart-wrap">
+            {showRectPixels ? (
+              <PixelGridChart
+                rows={coordinateRows}
+                bounds={graphPlan.bounds}
+                showGrid={showGrid}
+              />
+            ) : (
+              <DataChart
+                points={points}
+                kind={cfg.chartKind}
+                showGrid={showGrid}
+                strokeWidth={cfg.strokeWidth}
+                pointRadius={cfg.pointRadius}
+              />
+            )}
+          </div>
+
+          {!showRectPixels && (
+            <div className="preview-toggles">
               <label className="field">
-                <span>Chart type (preview)</span>
+                <span>Preview</span>
                 <select
                   value={cfg.chartKind}
                   onChange={(e) =>
@@ -251,14 +264,13 @@ function App() {
                     }))
                   }
                 >
-                  <option value="line">Line (numeric X and Y)</option>
-                  <option value="scatter">Scatter (numeric X and Y)</option>
-                  <option value="bar">Bar (y by row index; x as label)</option>
+                  <option value="line">Line</option>
+                  <option value="scatter">Scatter</option>
+                  <option value="bar">Bar</option>
                 </select>
               </label>
-
               <label className="field">
-                <span>Line width</span>
+                <span>Line</span>
                 <input
                   type="range"
                   min={1}
@@ -272,9 +284,8 @@ function App() {
                   }
                 />
               </label>
-
               <label className="field">
-                <span>Point size</span>
+                <span>Points</span>
                 <input
                   type="range"
                   min={2}
@@ -289,46 +300,12 @@ function App() {
                 />
               </label>
             </div>
-            )}
-          </div>
-
-          <div className="chart-wrap chart-wrap-preview">
-            {showRectPixels ? (
-              <PixelGridChart
-                rows={coordinateRows}
-                bounds={graphPlan.bounds}
-                showGrid={graphPlan.gridLines === 'yes'}
-              />
-            ) : (
-              <DataChart
-                points={points}
-                kind={cfg.chartKind}
-                showGrid={graphPlan.gridLines === 'yes'}
-                strokeWidth={cfg.strokeWidth}
-                pointRadius={cfg.pointRadius}
-              />
-            )}
-          </div>
-
-          {showRectPixels && coordinateRows.length > 0 && (
-            <p className="chart-caption chart-caption-preview">
-              Rectangles: each (x, y) fills one unit cell; bounds set grid size.
-            </p>
-          )}
-          {!showRectPixels && points.length > 0 && (
-            <p className="chart-caption chart-caption-preview">
-              Preview: {points.length} point{points.length === 1 ? '' : 's'}
-              {isPolar
-                ? ' (polar → Cartesian for plot; capped by point count).'
-                : ` (x, y${hasZ ? ', z' : ''} per line; capped by point count).`}
-            </p>
           )}
 
-          <div className="plan-section">
-            <h3 className="plan-section-title">Options</h3>
-            <div className="field-grid">
+          <div className="settings-block">
+            <div className="settings-grid">
               <label className="field">
-                <span>1. Graph type</span>
+                <span>Coordinates</span>
                 <select
                   value={graphPlan.coordinateSystem}
                   onChange={(e) => {
@@ -344,45 +321,13 @@ function App() {
                     }))
                   }}
                 >
-                  <option value="rectangular">Rectangular coordinates</option>
-                  <option value="polar">Polar coordinates</option>
-                </select>
-              </label>
-
-              {!isPolar && (
-                <label className="field checkbox-field">
-                  <input
-                    type="checkbox"
-                    checked={graphPlan.usePixels}
-                    onChange={(e) =>
-                      setGraphPlan((p) => ({
-                        ...p,
-                        usePixels: e.target.checked,
-                      }))
-                    }
-                  />
-                  <span>Pixels (filled rectangles on the grid)</span>
-                </label>
-              )}
-
-              <label className="field">
-                <span>2. Grid lines</span>
-                <select
-                  value={graphPlan.gridLines}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      gridLines: e.target.value as GraphPlanConfig['gridLines'],
-                    }))
-                  }
-                >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
+                  <option value="rectangular">Rectangular</option>
+                  <option value="polar">Polar</option>
                 </select>
               </label>
 
               <label className="field">
-                <span>3. Point types</span>
+                <span>Point type</span>
                 <select
                   value={graphPlan.pointType}
                   onChange={(e) =>
@@ -393,12 +338,12 @@ function App() {
                   }
                 >
                   <option value="circle">Circle</option>
-                  <option value="rectangle">Rectangles</option>
+                  <option value="rectangle">Rectangle</option>
                 </select>
               </label>
 
               <label className="field">
-                <span>4. Display method</span>
+                <span>Display</span>
                 <select
                   value={graphPlan.displayMethod}
                   onChange={(e) =>
@@ -410,124 +355,12 @@ function App() {
                   }
                 >
                   <option value="all-at-once">All at once</option>
-                  <option value="one-point-at-a-time">
-                    One point at a time
-                  </option>
+                  <option value="one-point-at-a-time">One step</option>
                 </select>
               </label>
 
               <label className="field">
-                <span>5. 3D</span>
-                <select
-                  value={graphPlan.threeD}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      threeD: e.target.value as GraphPlanConfig['threeD'],
-                    }))
-                  }
-                >
-                  <option value="yes-with-color">Yes, with color</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>6. Multicolored points</span>
-                <select
-                  value={graphPlan.multicolored}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      multicolored: e.target
-                        .value as GraphPlanConfig['multicolored'],
-                    }))
-                  }
-                >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>7. Trendline</span>
-                <select
-                  value={graphPlan.trendline}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      trendline: e.target.value as GraphPlanConfig['trendline'],
-                    }))
-                  }
-                >
-                  <option value="none">None</option>
-                  <option value="linear">Linear</option>
-                  <option value="polynomial">Polynomial</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <div className="plan-section">
-            <h3 className="plan-section-title">Input</h3>
-            <div className="field-grid">
-              <div className="field bounds-field">
-                <span>1. Graph bounds</span>
-                <p className="field-hint">
-                  {isPolar
-                    ? 'R and angle (radians) shown on the polar plot.'
-                    : 'X and Y limits; each integer (x, y) is one rectangle when Pixels is on.'}
-                </p>
-                <div className="bounds-grid">
-                  <label className="metric">
-                    <span className="metric-label">
-                      {isPolar ? 'R lower' : 'X lower'}
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={graphPlan.bounds.xMin}
-                      onChange={(e) => setBound('xMin', e.target.value)}
-                    />
-                  </label>
-                  <label className="metric">
-                    <span className="metric-label">
-                      {isPolar ? 'R upper' : 'X upper'}
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={graphPlan.bounds.xMax}
-                      onChange={(e) => setBound('xMax', e.target.value)}
-                    />
-                  </label>
-                  <label className="metric">
-                    <span className="metric-label">
-                      {isPolar ? 'Angle lower (rad)' : 'Y lower'}
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={graphPlan.bounds.yMin}
-                      onChange={(e) => setBound('yMin', e.target.value)}
-                    />
-                  </label>
-                  <label className="metric">
-                    <span className="metric-label">
-                      {isPolar ? 'Angle upper (rad)' : 'Y upper'}
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={graphPlan.bounds.yMax}
-                      onChange={(e) => setBound('yMax', e.target.value)}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <label className="field">
-                <span>2. Graph type</span>
+                <span>Scale</span>
                 <select
                   value={graphPlan.inputScaleType}
                   onChange={(e) =>
@@ -539,13 +372,30 @@ function App() {
                   }
                 >
                   <option value="linear">Linear</option>
-                  <option value="logarithmic">Logarithmic</option>
-                  <option value="polynomial">Polynomial</option>
+                  <option value="logarithmic">Log</option>
+                  <option value="polynomial">Poly</option>
                 </select>
               </label>
 
               <label className="field">
-                <span>3. Point count</span>
+                <span>Trendline</span>
+                <select
+                  value={graphPlan.trendline}
+                  onChange={(e) =>
+                    setGraphPlan((p) => ({
+                      ...p,
+                      trendline: e.target.value as GraphPlanConfig['trendline'],
+                    }))
+                  }
+                >
+                  <option value="none">None</option>
+                  <option value="linear">Linear</option>
+                  <option value="polynomial">Poly</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Point count</span>
                 <input
                   type="number"
                   min={10}
@@ -564,39 +414,124 @@ function App() {
                 />
               </label>
 
-              <label className="field">
-                <span>4. Points</span>
-                <select
-                  value={graphPlan.pointsLayout}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      pointsLayout: e.target
-                        .value as GraphPlanConfig['pointsLayout'],
-                    }))
-                  }
-                >
-                  <option value="rows-xy">Rows of x, y (optional z)</option>
-                </select>
-              </label>
+              <div className="checkbox-row">
+                <label className="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) =>
+                      setGraphPlan((p) => ({
+                        ...p,
+                        gridLines: e.target.checked ? 'yes' : 'no',
+                      }))
+                    }
+                  />
+                  Grid lines
+                </label>
+                {!isPolar && (
+                  <label className="checkbox-inline">
+                    <input
+                      type="checkbox"
+                      checked={graphPlan.usePixels}
+                      onChange={(e) =>
+                        setGraphPlan((p) => ({
+                          ...p,
+                          usePixels: e.target.checked,
+                        }))
+                      }
+                    />
+                    Pixels
+                  </label>
+                )}
+                <label className="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    checked={graphPlan.threeD === 'yes-with-color'}
+                    onChange={(e) =>
+                      setGraphPlan((p) => ({
+                        ...p,
+                        threeD: e.target.checked ? 'yes-with-color' : 'no',
+                      }))
+                    }
+                  />
+                  3D
+                </label>
+                <label className="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    checked={graphPlan.multicolored === 'yes'}
+                    onChange={(e) =>
+                      setGraphPlan((p) => ({
+                        ...p,
+                        multicolored: e.target.checked ? 'yes' : 'no',
+                      }))
+                    }
+                  />
+                  Multicolor
+                </label>
+              </div>
+
+              <div className="bounds-row">
+                <label className="metric">
+                  <span className="metric-label">
+                    {isPolar ? 'R min' : 'X min'}
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={graphPlan.bounds.xMin}
+                    onChange={(e) => setBound('xMin', e.target.value)}
+                  />
+                </label>
+                <label className="metric">
+                  <span className="metric-label">
+                    {isPolar ? 'R max' : 'X max'}
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={graphPlan.bounds.xMax}
+                    onChange={(e) => setBound('xMax', e.target.value)}
+                  />
+                </label>
+                <label className="metric">
+                  <span className="metric-label">
+                    {isPolar ? 'θ min' : 'Y min'}
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={graphPlan.bounds.yMin}
+                    onChange={(e) => setBound('yMin', e.target.value)}
+                  />
+                </label>
+                <label className="metric">
+                  <span className="metric-label">
+                    {isPolar ? 'θ max' : 'Y max'}
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={graphPlan.bounds.yMax}
+                    onChange={(e) => setBound('yMax', e.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="create-graph-row">
+              <button
+                type="button"
+                className="create-graph-btn"
+                disabled
+                title="Not wired yet"
+              >
+                Create graph
+              </button>
+              <p className="create-graph-hint">Preview only — Create graph not wired yet.</p>
             </div>
           </div>
-
-          <div className="create-graph-row">
-            <button
-              type="button"
-              className="create-graph-btn"
-              disabled
-              title="Not wired yet"
-            >
-              Create graph
-            </button>
-            <p className="create-graph-hint">
-              Options above are saved in the form only; this button does not
-              build a graph yet.
-            </p>
-          </div>
-        </section>
+        </div>
       </div>
     </div>
   )

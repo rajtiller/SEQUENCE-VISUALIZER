@@ -10,9 +10,9 @@ type Props = {
   pointRadius: number
 }
 
-const W = 640
-const H = 360
-const pad = { l: 48, r: 16, t: 16, b: 40 }
+const W = 560
+const H = 200
+const pad = { l: 40, r: 12, t: 10, b: 28 }
 
 function scaleDomain(
   values: number[],

@@ -60,14 +60,22 @@
   margin: 0 auto;
   text-align: center;
   border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  height: 100svh;
+  max-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+html {
+  height: 100%;
 }
 
 h1,

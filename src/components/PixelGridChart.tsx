@@ -14,9 +14,9 @@ type Props = {
   showGrid: boolean
 }
 
-const W = 640
-const H = 360
-const pad = { l: 44, r: 16, t: 16, b: 40 }
+const W = 560
+const H = 200
+const pad = { l: 40, r: 12, t: 10, b: 28 }
 const MAX_GRID_CELLS = 12_000
 
 export function PixelGridChart({ rows, bounds, showGrid }: Props) {
