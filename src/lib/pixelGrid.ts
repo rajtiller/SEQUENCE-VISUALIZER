@@ -1,5 +1,6 @@
 import type { CoordinateRow } from './parseCsv'
 import type { GraphBounds } from './graphPlanConfig'
+import { yieldToMain } from './yieldToMain'
 
 export type GridCell = { gx: number; gy: number }
 
@@ -27,6 +28,41 @@ export function buildFilledCells(rows: CoordinateRow[]): FilledCellsModel {
     }
     seen.add(key)
     occupied.push({ gx, gy })
+  }
+
+  return { occupied, truncated }
+}
+
+const FILL_CHUNK = 4000
+
+/** Build filled cells in batches so progress UI can update on large CSVs. */
+export async function buildFilledCellsAsync(
+  rows: CoordinateRow[],
+  onProgress?: (fraction: number) => void,
+): Promise<FilledCellsModel> {
+  const seen = new Set<string>()
+  const occupied: GridCell[] = []
+  let truncated = false
+  const n = rows.length
+
+  for (let i = 0; i < n; i += FILL_CHUNK) {
+    const end = Math.min(i + FILL_CHUNK, n)
+    for (let j = i; j < end; j += 1) {
+      const row = rows[j]
+      const gx = Math.round(row.x)
+      const gy = Math.round(row.y)
+      const key = `${gx},${gy}`
+      if (seen.has(key)) continue
+      if (occupied.length >= MAX_FILLED) {
+        truncated = true
+        onProgress?.(1)
+        return { occupied, truncated }
+      }
+      seen.add(key)
+      occupied.push({ gx, gy })
+    }
+    onProgress?.(end / n)
+    await yieldToMain()
   }
 
   return { occupied, truncated }

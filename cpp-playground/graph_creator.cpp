@@ -69,7 +69,7 @@ int main() {
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "Time taken 1: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
     start = std::chrono::high_resolution_clock::now();
-    largest_prime_factor_2(1000000);
+    largest_prime_factor_2(1000);
     end = std::chrono::high_resolution_clock::now();
     std::cout << "Time taken 2: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
 

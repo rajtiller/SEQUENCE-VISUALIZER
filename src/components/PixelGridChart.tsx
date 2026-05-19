@@ -6,20 +6,48 @@ import {
   gridCellCount,
   isCellInBounds,
   iterGridCells,
+  type FilledCellsModel,
 } from '../lib/pixelGrid'
 
 type Props = {
   rows: CoordinateRow[]
   bounds: GraphBounds
   showGrid: boolean
+  width?: number
+  height?: number
+  /** Pre-built on large graphs so the view can show progress while preparing. */
+  filledCells?: FilledCellsModel
 }
 
-const W = 560
-const H = 200
-const pad = { l: 40, r: 12, t: 10, b: 28 }
+const DEFAULT_W = 560
+const DEFAULT_H = 200
+
+function chartPad(w: number, h: number) {
+  return {
+    l: Math.max(40, Math.round(w * 0.07)),
+    r: Math.max(12, Math.round(w * 0.02)),
+    t: Math.max(10, Math.round(h * 0.04)),
+    b: Math.max(28, Math.round(h * 0.1)),
+  }
+}
 const MAX_GRID_CELLS = 12_000
 
-export function PixelGridChart({ rows, bounds, showGrid }: Props) {
+export function PixelGridChart({
+  rows,
+  bounds,
+  showGrid,
+  width = DEFAULT_W,
+  height = DEFAULT_H,
+  filledCells: filledCellsProp,
+}: Props) {
+  const W = width
+  const H = height
+  const pad = chartPad(W, H)
+  const fullSize = width !== DEFAULT_W || height !== DEFAULT_H
+  const svgSize = fullSize
+    ? ({ width: '100%', height: '100%', preserveAspectRatio: 'xMidYMid meet' } as const)
+    : ({ width: '100%', height: 'auto' } as const)
+  const cornerRadius = fullSize ? 0 : 8
   const innerW = W - pad.l - pad.r
   const innerH = H - pad.t - pad.b
   const xSpan = bounds.xMax - bounds.xMin
@@ -27,8 +55,8 @@ export function PixelGridChart({ rows, bounds, showGrid }: Props) {
   const invalidBounds = xSpan <= 0 || ySpan <= 0
 
   const { occupied, truncated } = useMemo(
-    () => buildFilledCells(rows),
-    [rows],
+    () => filledCellsProp ?? buildFilledCells(rows),
+    [filledCellsProp, rows],
   )
 
   const occupiedKeys = useMemo(
@@ -69,12 +97,11 @@ export function PixelGridChart({ rows, bounds, showGrid }: Props) {
       <svg
         className="data-chart pixel-grid-chart"
         viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        height="auto"
+        {...svgSize}
         role="img"
         aria-label="Invalid graph bounds"
       >
-        <rect width={W} height={H} fill="var(--chart-bg)" rx="8" />
+        <rect width={W} height={H} fill="var(--chart-bg)" rx={cornerRadius} />
         <text
           x={W / 2}
           y={H / 2}
@@ -93,12 +120,11 @@ export function PixelGridChart({ rows, bounds, showGrid }: Props) {
       <svg
         className="data-chart pixel-grid-chart"
         viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        height="auto"
+        {...svgSize}
         role="img"
         aria-label="Rectangle grid"
       >
-        <rect width={W} height={H} fill="var(--chart-bg)" rx="8" />
+        <rect width={W} height={H} fill="var(--chart-bg)" rx={cornerRadius} />
         {drawFullGrid &&
           gridCells.map(({ gx, gy }) => (
             <rect
@@ -152,12 +178,11 @@ export function PixelGridChart({ rows, bounds, showGrid }: Props) {
     <svg
       className="data-chart pixel-grid-chart"
       viewBox={`0 0 ${W} ${H}`}
-      width="100%"
-      height="auto"
+      {...svgSize}
       role="img"
       aria-label="Rectangle grid from graph bounds"
     >
-      <rect width={W} height={H} fill="var(--chart-bg)" rx="8" />
+      <rect width={W} height={H} fill="var(--chart-bg)" rx={cornerRadius} />
 
       {drawFullGrid &&
         gridCells.map(({ gx, gy }) => {

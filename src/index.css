@@ -68,6 +68,14 @@
   overflow: hidden;
 }
 
+html.graph-view-route #root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: none;
+  text-align: left;
+}
+
 body {
   margin: 0;
   height: 100%;

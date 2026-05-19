@@ -1,0 +1,25 @@
+.progress-bar {
+  width: 100%;
+  min-width: 160px;
+}
+
+.progress-bar__track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 120ms ease-out;
+}
+
+.progress-bar__label {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.35;
+}

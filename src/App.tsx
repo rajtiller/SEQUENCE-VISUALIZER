@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type DragEvent } from 'react'
-import { DataChart, type ChartPoint } from './components/DataChart'
+import { DataChart } from './components/DataChart'
 import { PixelGridChart } from './components/PixelGridChart'
 import {
   parseCoordinateCsv,
@@ -14,36 +14,17 @@ import {
   type GraphBounds,
   type GraphPlanConfig,
 } from './lib/graphPlanConfig'
-import { rowsToCartesianPoints } from './lib/polarGrid'
+import { resolveChartPoints } from './lib/buildChartData'
+import {
+  openGraphInNewTab,
+  saveGraphExportAsync,
+  shouldShowGraphProgress,
+} from './lib/graphExport'
+import { ProgressBar } from './components/ProgressBar'
 import { defaultVizConfig, type VizConfig } from './lib/vizConfig'
 import './App.css'
 
 const PREVIEW_ROW_COUNT = 4
-
-function buildChartPoints(
-  rows: CoordinateRow[],
-  cfg: VizConfig,
-  maxPoints: number,
-): ChartPoint[] {
-  const cap = Math.max(1, Math.min(maxPoints, 20_000))
-  const slice = rows.slice(0, cap)
-
-  if (cfg.chartKind === 'bar') {
-    return slice.map((row, i) => ({
-      x: i,
-      y: row.y,
-      z: row.z,
-      label: String(row.x),
-    }))
-  }
-
-  return slice.map((row) => ({
-    x: row.x,
-    y: row.y,
-    z: row.z,
-    label: String(row.x),
-  }))
-}
 
 function App() {
   const [fileName, setFileName] = useState<string | null>(null)
@@ -123,24 +104,53 @@ function App() {
     e.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  const rowsForChart = useMemo(() => {
-    const cap = Math.max(
-      1,
-      Math.min(graphPlan.pointCount, 20_000, coordinateRows.length),
-    )
-    return coordinateRows.slice(0, cap)
-  }, [coordinateRows, graphPlan.pointCount])
+  const points = useMemo(
+    () => resolveChartPoints(coordinateRows, graphPlan, cfg),
+    [coordinateRows, graphPlan, cfg],
+  )
 
-  const points = useMemo(() => {
-    if (rowsForChart.length === 0) return []
-    if (graphPlan.coordinateSystem === 'polar') {
-      return rowsToCartesianPoints(rowsForChart).map((p, i) => ({
-        ...p,
-        label: String(rowsForChart[i].x),
-      }))
+  const canCreateGraph = coordinateRows.length > 0
+  const [createGraphProgress, setCreateGraphProgress] = useState<{
+    value: number
+    message: string
+  } | null>(null)
+
+  const onCreateGraph = useCallback(async () => {
+    if (!canCreateGraph || createGraphProgress) return
+
+    const showProgress = shouldShowGraphProgress(coordinateRows.length)
+    if (showProgress) {
+      setCreateGraphProgress({ value: 0, message: 'Starting…' })
     }
-    return buildChartPoints(rowsForChart, cfg, rowsForChart.length)
-  }, [rowsForChart, graphPlan.coordinateSystem, cfg])
+
+    const result = await saveGraphExportAsync(
+      {
+        coordinateRows,
+        graphPlan,
+        vizConfig: cfg,
+        fileName,
+      },
+      (value, message) => {
+        if (showProgress) setCreateGraphProgress({ value, message })
+      },
+    )
+
+    setCreateGraphProgress(null)
+
+    if (!result.ok) {
+      setParseError(result.error)
+      return
+    }
+
+    openGraphInNewTab()
+  }, [
+    canCreateGraph,
+    coordinateRows,
+    graphPlan,
+    cfg,
+    fileName,
+    createGraphProgress,
+  ])
 
   const previewRows = useMemo(
     () => coordinateRows.slice(0, PREVIEW_ROW_COUNT),
@@ -501,16 +511,35 @@ function App() {
               <button
                 type="button"
                 className="create-graph-btn"
-                disabled
-                title="Not wired yet"
+                disabled={!canCreateGraph || createGraphProgress != null}
+                title={
+                  canCreateGraph
+                    ? 'Open full-screen graph in a new tab'
+                    : 'Load a CSV first'
+                }
+                onClick={onCreateGraph}
               >
                 Create graph
               </button>
-              <p className="create-graph-hint">Preview only — Create graph not wired yet.</p>
+              <p className="create-graph-hint">
+                Opens a new tab with the graph only (read-only).
+              </p>
             </div>
           </div>
         </div>
       </div>
+
+      {createGraphProgress ? (
+        <div className="create-graph-overlay" role="dialog" aria-modal="true">
+          <div className="create-graph-overlay__panel">
+            <p className="create-graph-overlay__title">Creating graph</p>
+            <ProgressBar
+              value={createGraphProgress.value}
+              label={createGraphProgress.message}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

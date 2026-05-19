@@ -8,11 +8,21 @@ type Props = {
   showGrid: boolean
   strokeWidth: number
   pointRadius: number
+  width?: number
+  height?: number
 }
 
-const W = 560
-const H = 200
-const pad = { l: 40, r: 12, t: 10, b: 28 }
+const DEFAULT_W = 560
+const DEFAULT_H = 200
+
+function chartPad(w: number, h: number) {
+  return {
+    l: Math.max(40, Math.round(w * 0.07)),
+    r: Math.max(12, Math.round(w * 0.02)),
+    t: Math.max(10, Math.round(h * 0.04)),
+    b: Math.max(28, Math.round(h * 0.1)),
+  }
+}
 
 function scaleDomain(
   values: number[],
@@ -35,17 +45,24 @@ export function DataChart({
   showGrid,
   strokeWidth,
   pointRadius,
+  width = DEFAULT_W,
+  height = DEFAULT_H,
 }: Props) {
+  const W = width
+  const H = height
+  const pad = chartPad(W, H)
   const innerW = W - pad.l - pad.r
   const innerH = H - pad.t - pad.b
+  const fullSize = width !== DEFAULT_W || height !== DEFAULT_H
 
   if (points.length === 0) {
     return (
       <svg
         className="data-chart"
         viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        height="auto"
+        width={fullSize ? '100%' : '100%'}
+        height={fullSize ? '100%' : 'auto'}
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="No numeric data to plot"
       >
@@ -96,11 +113,12 @@ export function DataChart({
       className="data-chart"
       viewBox={`0 0 ${W} ${H}`}
       width="100%"
-      height="auto"
+      height={fullSize ? '100%' : 'auto'}
+      preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label="Data visualization"
     >
-      <rect width={W} height={H} fill="var(--chart-bg)" rx="8" />
+      <rect width={W} height={H} fill="var(--chart-bg)" rx={fullSize ? 0 : 8} />
 
       {showGrid && (
         <g className="grid" stroke="var(--border)" strokeWidth="1" opacity={0.9}>
