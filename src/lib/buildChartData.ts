@@ -2,6 +2,7 @@ import type { ChartPoint } from '../components/DataChart'
 import type { CoordinateRow } from './parseCsv'
 import {
   isAllAtOnceDisplay,
+  sliceToPointLimit,
   type GraphBounds,
   type GraphPlanConfig,
 } from './graphPlanConfig'
@@ -9,31 +10,33 @@ import { rowsToCartesianPoints } from './polarGrid'
 import { buildHistogramChartPoints } from './histogram'
 import type { VizConfig } from './vizConfig'
 
-/** Max points drawn in the full-screen graph (preview uses `graphPlan.pointCount`). */
-export const MAX_GRAPH_VIEW_POINTS = 50_000
+export function plotRows(
+  rows: CoordinateRow[],
+  graphPlan: GraphPlanConfig,
+): CoordinateRow[] {
+  return sliceToPointLimit(rows, graphPlan.pointCount)
+}
 
 export function buildChartPoints(
   rows: CoordinateRow[],
   cfg: VizConfig,
-  maxPoints: number,
   bounds?: GraphBounds,
 ): ChartPoint[] {
-  const cap = Math.max(1, Math.min(maxPoints, 20_000))
-  const slice = rows.slice(0, cap)
+  if (rows.length === 0) return []
 
   if (cfg.chartKind === 'histogram') {
     const domain =
       bounds && bounds.xMax > bounds.xMin
         ? { domainMin: bounds.xMin, domainMax: bounds.xMax }
         : undefined
-    return buildHistogramChartPoints(slice, cfg.histogramSource, {
+    return buildHistogramChartPoints(rows, cfg.histogramSource, {
       interval: cfg.histogramInterval,
       ...domain,
     })
   }
 
   if (cfg.chartKind === 'bar') {
-    return slice.map((row, i) => ({
+    return rows.map((row, i) => ({
       x: i,
       y: row.y,
       z: row.z,
@@ -41,7 +44,7 @@ export function buildChartPoints(
     }))
   }
 
-  return slice.map((row) => ({
+  return rows.map((row) => ({
     x: row.x,
     y: row.y,
     z: row.z,
@@ -54,15 +57,11 @@ export function resolveChartPoints(
   graphPlan: GraphPlanConfig,
   cfg: VizConfig,
 ): ChartPoint[] {
-  const cap = Math.max(
-    1,
-    Math.min(graphPlan.pointCount, 20_000, rows.length),
-  )
-  const slice = rows.slice(0, cap)
+  const slice = plotRows(rows, graphPlan)
   if (slice.length === 0) return []
 
   if (cfg.chartKind === 'histogram') {
-    return buildChartPoints(slice, cfg, slice.length)
+    return buildChartPoints(slice, cfg, graphPlan.bounds)
   }
 
   if (graphPlan.coordinateSystem === 'polar') {
@@ -72,46 +71,30 @@ export function resolveChartPoints(
     }))
   }
 
-  return buildChartPoints(slice, cfg, slice.length, graphPlan.bounds)
+  return buildChartPoints(slice, cfg, graphPlan.bounds)
 }
 
 export function rowsForGraph(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
 ): CoordinateRow[] {
-  const cap = Math.max(
-    1,
-    Math.min(graphPlan.pointCount, 20_000, rows.length),
-  )
-  return rows.slice(0, cap)
+  return plotRows(rows, graphPlan)
 }
 
-export function capGraphViewRows(rows: CoordinateRow[]): CoordinateRow[] {
-  if (rows.length <= MAX_GRAPH_VIEW_POINTS) return rows
-  return rows.slice(0, MAX_GRAPH_VIEW_POINTS)
+/** @deprecated Use plotRows */
+export function capGraphViewRows(
+  rows: CoordinateRow[],
+  graphPlan: GraphPlanConfig,
+): CoordinateRow[] {
+  return plotRows(rows, graphPlan)
 }
 
-/** Full-screen graph: use all loaded rows (up to cap), not preview `pointCount`. */
 export function resolveGraphViewPoints(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   cfg: VizConfig,
 ): ChartPoint[] {
-  const slice = capGraphViewRows(rows)
-  if (slice.length === 0) return []
-
-  if (cfg.chartKind === 'histogram') {
-    return buildChartPoints(slice, cfg, slice.length)
-  }
-
-  if (graphPlan.coordinateSystem === 'polar') {
-    return rowsToCartesianPoints(slice).map((p, i) => ({
-      ...p,
-      label: String(slice[i].x),
-    }))
-  }
-
-  return buildChartPoints(slice, cfg, slice.length, graphPlan.bounds)
+  return resolveChartPoints(rows, graphPlan, cfg)
 }
 
 export { isAllAtOnceDisplay }

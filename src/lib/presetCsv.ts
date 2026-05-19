@@ -70,9 +70,12 @@ export function normalizeGraphPlan(
     pointsPerSecond = value.pointsPerSecond!
   }
 
-  const pointCount = Number.isFinite(value.pointCount)
-    ? Math.max(10, Math.min(20_000, value.pointCount!))
-    : d.pointCount
+  let pointCount: number | null = d.pointCount
+  if (value.pointCount === null) {
+    pointCount = null
+  } else if (Number.isFinite(value.pointCount) && value.pointCount! > 0) {
+    pointCount = Math.floor(value.pointCount!)
+  }
 
   return {
     coordinateSystem,

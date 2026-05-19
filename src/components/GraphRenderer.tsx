@@ -4,8 +4,8 @@ import { PixelGridChart } from './PixelGridChart'
 import type { GraphExportPayload } from '../lib/graphExport'
 import type { PreparedGraphRender } from '../lib/prepareGraphRender'
 import {
-  capGraphViewRows,
   isAllAtOnceDisplay,
+  plotRows,
   resolveGraphViewPoints,
 } from '../lib/buildChartData'
 import { normalizeGraphBounds } from '../lib/graphPlanConfig'
@@ -36,7 +36,7 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
 
   const graphRows = useMemo(() => {
     if (prepared) return prepared.graphRows
-    return capGraphViewRows(coordinateRows)
+    return plotRows(coordinateRows, graphPlan)
   }, [prepared, coordinateRows])
 
   const animate = !isAllAtOnceDisplay(graphPlan.pointsPerSecond)

@@ -2,10 +2,7 @@ import type { ChartPoint } from '../components/DataChart'
 import type { FilledCellsModel } from './pixelGrid'
 import { buildFilledCellsAsync } from './pixelGrid'
 import type { CoordinateRow } from './parseCsv'
-import {
-  buildChartPoints,
-  capGraphViewRows,
-} from './buildChartData'
+import { buildChartPoints, plotRows } from './buildChartData'
 import type { GraphExportPayload } from './graphExport'
 import { shouldShowGraphProgress } from './graphExport'
 import { rowsToCartesianPoints } from './polarGrid'
@@ -28,7 +25,7 @@ export async function prepareGraphRenderData(
 ): Promise<PreparedGraphRender> {
   const { coordinateRows, graphPlan } = payload
   const vizConfig = normalizeVizConfig(payload.vizConfig)
-  const graphRows = capGraphViewRows(coordinateRows)
+  const graphRows = plotRows(coordinateRows, graphPlan)
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
   const n = graphRows.length
@@ -51,9 +48,7 @@ export async function prepareGraphRenderData(
   if (vizConfig.chartKind === 'histogram') {
     onProgress(0.2, 'Building histogram…')
     await yieldToMain()
-    allPoints.push(
-      ...buildChartPoints(graphRows, vizConfig, graphRows.length, graphPlan.bounds),
-    )
+    allPoints.push(...buildChartPoints(graphRows, vizConfig, graphPlan.bounds))
     onProgress(1, 'Ready')
     return { allPoints, graphRows }
   }
@@ -76,9 +71,7 @@ export async function prepareGraphRenderData(
   } else {
     for (let i = 0; i < n; i += PROCESS_CHUNK) {
       const slice = graphRows.slice(i, i + PROCESS_CHUNK)
-      allPoints.push(
-        ...buildChartPoints(slice, vizConfig, slice.length, graphPlan.bounds),
-      )
+      allPoints.push(...buildChartPoints(slice, vizConfig, graphPlan.bounds))
       const done = Math.min(i + slice.length, n)
       onProgress(
         (done / n) * 0.95,
@@ -107,12 +100,7 @@ function prepareGraphRenderDataSync(
 
   if (vizConfig.chartKind === 'histogram') {
     return {
-      allPoints: buildChartPoints(
-        graphRows,
-        vizConfig,
-        graphRows.length,
-        graphPlan.bounds,
-      ),
+      allPoints: buildChartPoints(graphRows, vizConfig, graphPlan.bounds),
       graphRows,
     }
   }
@@ -128,12 +116,7 @@ function prepareGraphRenderDataSync(
   }
 
   return {
-    allPoints: buildChartPoints(
-      graphRows,
-      vizConfig,
-      graphRows.length,
-      graphPlan.bounds,
-    ),
+    allPoints: buildChartPoints(graphRows, vizConfig, graphPlan.bounds),
     graphRows,
   }
 }

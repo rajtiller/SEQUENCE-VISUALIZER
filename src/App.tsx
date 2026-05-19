@@ -21,7 +21,7 @@ import {
   type GraphBounds,
   type GraphPlanConfig,
 } from './lib/graphPlanConfig'
-import { resolveChartPoints } from './lib/buildChartData'
+import { plotRows, resolveChartPoints } from './lib/buildChartData'
 import {
   openGraphInNewTab,
   saveGraphExportAsync,
@@ -156,6 +156,11 @@ function App() {
   const displayFileName =
     inputMode === 'combined' ? fileName : listsInputLabel(lists)
 
+  const plotRowsData = useMemo(
+    () => plotRows(coordinateRows, graphPlan),
+    [coordinateRows, graphPlan.pointCount],
+  )
+
   const onFile = useCallback(
     (file: File | null) => {
       if (!file) return
@@ -201,7 +206,7 @@ function App() {
     [coordinateRows, graphPlan, cfg],
   )
 
-  const canCreateGraph = coordinateRows.length > 0
+  const canCreateGraph = plotRowsData.length > 0
   const [createGraphProgress, setCreateGraphProgress] = useState<{
     value: number
     message: string
@@ -217,7 +222,7 @@ function App() {
 
     const result = await saveGraphExportAsync(
       {
-        coordinateRows,
+        coordinateRows: plotRowsData,
         graphPlan,
         vizConfig: cfg,
         fileName: displayFileName,
@@ -237,7 +242,7 @@ function App() {
     openGraphInNewTab()
   }, [
     canCreateGraph,
-    coordinateRows,
+    plotRowsData,
     graphPlan,
     cfg,
     displayFileName,
@@ -245,8 +250,8 @@ function App() {
   ])
 
   const previewRows = useMemo(
-    () => coordinateRows.slice(0, PREVIEW_ROW_COUNT),
-    [coordinateRows],
+    () => plotRowsData.slice(0, PREVIEW_ROW_COUNT),
+    [plotRowsData],
   )
 
   const isPolar = graphPlan.coordinateSystem === 'polar'
@@ -355,9 +360,14 @@ function App() {
 
           {coordinateRows.length > 0 && (
             <p className="viz-meta">
-              {coordinateRows.length} pts{hasZ ? ' · z' : ''}
-              {coordinateRows.length > PREVIEW_ROW_COUNT
-                ? ` · first ${PREVIEW_ROW_COUNT} below`
+              {plotRowsData.length.toLocaleString()} plotted
+              {graphPlan.pointCount != null &&
+              plotRowsData.length < coordinateRows.length
+                ? ` of ${coordinateRows.length.toLocaleString()}`
+                : ''}
+              {hasZ ? ' · z' : ''}
+              {previewRows.length > 0 && previewRows.length <= PREVIEW_ROW_COUNT
+                ? ` · first ${previewRows.length} below`
                 : ''}
             </p>
           )}
@@ -392,7 +402,7 @@ function App() {
           <div className="chart-wrap">
             {showRectPixels ? (
               <PixelGridChart
-                rows={coordinateRows}
+                rows={plotRowsData}
                 bounds={graphPlan.bounds}
                 showGrid={showGrid}
               />
@@ -574,20 +584,26 @@ function App() {
               </label>
 
               <label className="field">
-                <span>Point count</span>
+                <span>First n points</span>
                 <input
                   type="number"
-                  min={10}
-                  max={20000}
-                  step={10}
-                  value={graphPlan.pointCount}
+                  min={1}
+                  step={1}
+                  placeholder="all"
+                  value={
+                    graphPlan.pointCount == null ? '' : graphPlan.pointCount
+                  }
                   onChange={(e) => {
-                    const n = Number.parseInt(e.target.value, 10)
+                    const raw = e.target.value.trim()
+                    if (raw === '') {
+                      setGraphPlan((p) => ({ ...p, pointCount: null }))
+                      return
+                    }
+                    const n = Number.parseInt(raw, 10)
                     setGraphPlan((p) => ({
                       ...p,
-                      pointCount: Number.isFinite(n)
-                        ? Math.max(10, Math.min(20000, n))
-                        : p.pointCount,
+                      pointCount:
+                        Number.isFinite(n) && n > 0 ? n : p.pointCount,
                     }))
                   }}
                 />

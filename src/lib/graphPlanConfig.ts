@@ -30,7 +30,8 @@ export type GraphPlanConfig = {
   multicolored: MulticoloredChoice
   bounds: GraphBounds
   inputScaleType: InputScaleTypeChoice
-  pointCount: number
+  /** First n rows to plot; null = all points. */
+  pointCount: number | null
   pointsLayout: PointsLayoutChoice
 }
 
@@ -146,7 +147,18 @@ export function defaultGraphPlanConfig(): GraphPlanConfig {
     multicolored: 'no',
     bounds: defaultRectBounds(),
     inputScaleType: 'linear',
-    pointCount: 500,
+    pointCount: null,
     pointsLayout: 'rows-xy',
   }
+}
+
+/** Keep the first n rows when limited; otherwise return all rows. */
+export function sliceToPointLimit(
+  rows: { x: number; y: number }[],
+  pointCount: number | null,
+): typeof rows {
+  if (pointCount == null || !Number.isFinite(pointCount) || pointCount <= 0) {
+    return rows
+  }
+  return rows.slice(0, Math.max(1, Math.floor(pointCount)))
 }
