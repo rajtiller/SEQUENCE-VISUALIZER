@@ -4,17 +4,9 @@ export type CoordinateSystem = 'rectangular' | 'polar'
 
 export type GridLinesChoice = 'yes' | 'no'
 
-export type PointTypeChoice = 'circle' | 'rectangle'
-
-/** Planning item 4.c is blank; two modes for now. */
-export type DisplayMethodChoice = 'all-at-once' | 'one-point-at-a-time'
-
 export type ThreeDChoice = 'yes-with-color' | 'no'
 
 export type MulticoloredChoice = 'yes' | 'no'
-
-/** Planning lists “Trendline” without options; common presets for the dropdown. */
-export type TrendlineChoice = 'none' | 'linear' | 'polynomial'
 
 export type InputScaleTypeChoice = 'linear' | 'logarithmic' | 'polynomial'
 
@@ -32,15 +24,21 @@ export type GraphPlanConfig = {
   /** Filled unit rectangles on the grid (rectangular coordinates only). */
   usePixels: boolean
   gridLines: GridLinesChoice
-  pointType: PointTypeChoice
-  displayMethod: DisplayMethodChoice
+  /** Blank or null = show all points at once; positive = animate at this rate. */
+  pointsPerSecond: number | null
   threeD: ThreeDChoice
   multicolored: MulticoloredChoice
-  trendline: TrendlineChoice
   bounds: GraphBounds
   inputScaleType: InputScaleTypeChoice
   pointCount: number
   pointsLayout: PointsLayoutChoice
+}
+
+/** Points are always drawn as circles (no UI option). */
+export const POINT_TYPE = 'circle' as const
+
+export function isAllAtOnceDisplay(pointsPerSecond: number | null): boolean {
+  return pointsPerSecond == null || pointsPerSecond <= 0
 }
 
 export function defaultRectBounds(): GraphBounds {
@@ -143,11 +141,9 @@ export function defaultGraphPlanConfig(): GraphPlanConfig {
     coordinateSystem: 'rectangular',
     usePixels: false,
     gridLines: 'yes',
-    pointType: 'circle',
-    displayMethod: 'all-at-once',
+    pointsPerSecond: null,
     threeD: 'no',
     multicolored: 'no',
-    trendline: 'none',
     bounds: defaultRectBounds(),
     inputScaleType: 'linear',
     pointCount: 500,

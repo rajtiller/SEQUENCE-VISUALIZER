@@ -327,36 +327,31 @@ function App() {
               </label>
 
               <label className="field">
-                <span>Point type</span>
-                <select
-                  value={graphPlan.pointType}
-                  onChange={(e) =>
+                <span>Points / sec</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder="leave blank for all at once"
+                  value={
+                    graphPlan.pointsPerSecond == null
+                      ? ''
+                      : graphPlan.pointsPerSecond
+                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.trim()
+                    if (raw === '') {
+                      setGraphPlan((p) => ({ ...p, pointsPerSecond: null }))
+                      return
+                    }
+                    const n = Number.parseFloat(raw)
                     setGraphPlan((p) => ({
                       ...p,
-                      pointType: e.target.value as GraphPlanConfig['pointType'],
+                      pointsPerSecond:
+                        Number.isFinite(n) && n > 0 ? n : null,
                     }))
-                  }
-                >
-                  <option value="circle">Circle</option>
-                  <option value="rectangle">Rectangle</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Display</span>
-                <select
-                  value={graphPlan.displayMethod}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      displayMethod: e.target
-                        .value as GraphPlanConfig['displayMethod'],
-                    }))
-                  }
-                >
-                  <option value="all-at-once">All at once</option>
-                  <option value="one-point-at-a-time">One step</option>
-                </select>
+                  }}
+                />
               </label>
 
               <label className="field">
@@ -373,23 +368,6 @@ function App() {
                 >
                   <option value="linear">Linear</option>
                   <option value="logarithmic">Log</option>
-                  <option value="polynomial">Poly</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Trendline</span>
-                <select
-                  value={graphPlan.trendline}
-                  onChange={(e) =>
-                    setGraphPlan((p) => ({
-                      ...p,
-                      trendline: e.target.value as GraphPlanConfig['trendline'],
-                    }))
-                  }
-                >
-                  <option value="none">None</option>
-                  <option value="linear">Linear</option>
                   <option value="polynomial">Poly</option>
                 </select>
               </label>
