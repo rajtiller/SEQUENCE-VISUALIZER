@@ -1,0 +1,51 @@
+We want the user to have multiple options to select then input a data file or two
+
+Options:
+
+    1. Graph Type
+        a. Rectangular Coordinates
+        b. Pixels
+        c. Polar Coordinates
+
+    2. Grid lines
+        a. Yes
+        b. No
+
+    3. Point Types
+        a. Circle
+        b. Rectangles
+    
+
+    4. Display Method
+        a. All at once
+        b. One point at a time
+        c. 
+
+    5. 3D
+        a. Yes, with color
+        b. No
+
+    6. Multicolored Points
+        a. Yes
+        b. No
+
+    7. Trendline
+
+Input:
+
+    1. Graph Scale
+        a. Width
+        b. Height
+        c. Color Range
+    
+    2. Graph Type
+        a. linear
+        b. logarithmic
+        c. polynomial
+
+    3. Point count
+
+    4. Points
+        a. Rows of x, y
+
+In the future we can save these

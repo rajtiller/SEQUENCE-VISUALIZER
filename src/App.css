@@ -1,0 +1,300 @@
+.viz-app {
+  text-align: left;
+  padding: 28px 24px 48px;
+}
+
+.viz-header {
+  margin-bottom: 28px;
+}
+
+.viz-header h1 {
+  font-size: 32px;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+}
+
+.viz-lead {
+  margin: 0;
+  max-width: 52ch;
+}
+
+.viz-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .viz-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.viz-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 20px 22px;
+}
+
+.viz-panel h2 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+
+.file-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.file-drop:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.file-drop-title {
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.file-drop-hint {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-error {
+  margin: 12px 0 0;
+  color: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  .viz-error {
+    color: #f87171;
+  }
+}
+
+.viz-meta {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-family: var(--mono);
+}
+
+.table-wrap {
+  margin-top: 16px;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--mono);
+}
+
+.preview-table th,
+.preview-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.preview-table th {
+  background: var(--code-bg);
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.preview-table tr:last-child td {
+  border-bottom: none;
+}
+
+.table-note {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--code-bg);
+}
+
+.field-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.field select,
+.field input[type='number'] {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.field input[type='range'] {
+  width: 100%;
+}
+
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-wrap-preview {
+  margin-top: 16px;
+}
+
+.chart-caption-preview {
+  margin-bottom: 4px;
+}
+
+.chart-wrap {
+  margin-top: 20px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.chart-caption {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.plan-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.plan-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.plan-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 12px;
+}
+
+.tri-field .inline-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.bounds-field .field-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.bounds-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .bounds-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .tri-field .inline-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.metric-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-h);
+}
+
+.metric input[type='number'] {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.create-graph-row {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.create-graph-btn {
+  font: inherit;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent);
+  color: var(--bg);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.create-graph-hint {
+  margin: 0;
+  flex: 1 1 200px;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
