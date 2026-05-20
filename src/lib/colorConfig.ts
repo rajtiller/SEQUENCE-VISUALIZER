@@ -88,7 +88,7 @@ export function normalizeColorConfig(
       ? value.colorHigh.trim()
       : d.colorHigh
 
-  return {
+  const normalized: ColorConfig = {
     source,
     valueMin,
     valueMax,
@@ -97,6 +97,7 @@ export function normalizeColorConfig(
     mappingMode,
     customExpression,
   }
+  return finalizeColorScaleOverrides(normalized)
 }
 
 export function colorSourceValue(
@@ -191,7 +192,10 @@ export function reconcileColorScaleOverrides(
   if (patch.valueMax !== undefined) {
     let valueMax = patch.valueMax
     if (valueMax != null && Number.isFinite(valueMax)) {
-      valueMax = Math.max(valueMax, floor)
+      // Only lift max toward floor when floor comes from a user-set min, not auto extent
+      if (color.valueMin != null && Number.isFinite(color.valueMin)) {
+        valueMax = Math.max(valueMax, color.valueMin)
+      }
     }
     out.valueMax = valueMax
   } else if (patch.source !== undefined && color.valueMax != null) {
@@ -201,6 +205,21 @@ export function reconcileColorScaleOverrides(
   }
 
   return out
+}
+
+/** If both overrides are set and min > max, pull min down (never raise max). */
+export function finalizeColorScaleOverrides(color: ColorConfig): ColorConfig {
+  const { valueMin, valueMax } = color
+  if (
+    valueMin == null ||
+    valueMax == null ||
+    !Number.isFinite(valueMin) ||
+    !Number.isFinite(valueMax) ||
+    valueMin <= valueMax
+  ) {
+    return color
+  }
+  return { ...color, valueMin: valueMax }
 }
 
 /** Normalized position along the scale (0 = low color, 1 = high color). */

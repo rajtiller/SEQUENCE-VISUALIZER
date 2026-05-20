@@ -30,6 +30,7 @@ import {
   coerceColorSource,
   colorValueExtent,
   formatColorScaleValue,
+  finalizeColorScaleOverrides,
   reconcileColorScaleOverrides,
   type ColorMappingMode,
   type ColorSource,
@@ -364,23 +365,29 @@ function App() {
   const patchColor = useCallback(
     (patch: Partial<GraphPlanConfig['color']>) => {
       setGraphPlan((p) => {
+        const source = (patch.source ?? p.color.source) as ColorSource
+        const extent = colorValueExtent(
+          sliceToPointLimit(coordinateRows, p.previewPointCount),
+          source,
+        )
         const needsBoundReconcile =
           patch.valueMin !== undefined ||
           patch.valueMax !== undefined ||
           patch.source !== undefined
         const boundPatch = needsBoundReconcile
-          ? reconcileColorScaleOverrides(p.color, colorAutoExtent, patch)
+          ? reconcileColorScaleOverrides(p.color, extent, patch)
           : {}
+        const merged = normalizeColorConfig(
+          { ...p.color, ...patch, ...boundPatch },
+          hasZ,
+        )
         return {
           ...p,
-          color: normalizeColorConfig(
-            { ...p.color, ...patch, ...boundPatch },
-            hasZ,
-          ),
+          color: finalizeColorScaleOverrides(merged),
         }
       })
     },
-    [hasZ, colorAutoExtent],
+    [hasZ, coordinateRows],
   )
 
   const commitBound = useCallback((key: keyof GraphBounds, n: number) => {

@@ -89,18 +89,33 @@ double knight_problem () {
     auto start = std::chrono::high_resolution_clock::now();
     auto points = std::vector<std::pair<int, int>>();
 
-    // std::unordered_set<std::pair<int, int>> visited;
+    std::set<std::pair<int, int>> visited;
 
-    // std::pair<int, int> current_position = std::make_pair(0, 0);
+    std::pair<int, int> current_position = std::make_pair(0, 0);
 
-    // while (true) {
-
-    // }
-
-    for (int number = 1; number <= 100; number++) {
-        std::cout << number << " " << square_to_number(number_to_square(number)) << std::endl;
-        // points.push_back(number_to_square(number));
+    while (true) {
+        visited.insert(current_position);
+        points.push_back(current_position);
+        std::pair<int, int> smallest_move = std::make_pair(0, 0);
+        int smallest_so_far = std::numeric_limits<int>::max();
+        for (int i = 0; i < 8; i++) {
+            int first_move = (i & 0b001)+1;
+            first_move = (i&0b100) ? first_move : (-first_move);
+            int second_move = 3-first_move;
+            second_move = (i&0b010) ? second_move : (-second_move);
+            auto new_position = std::make_pair(current_position.first + first_move, current_position.second + second_move);
+            if (visited.find(new_position) == visited.end() && (square_to_number(new_position) < smallest_so_far)) {
+                smallest_move = new_position;
+                smallest_so_far = square_to_number(new_position);
+            }
+        }
+        if (smallest_so_far == std::numeric_limits<int>::max()) {
+            break;
+        }
+        current_position = smallest_move;
     }
+
+
     auto end = std::chrono::high_resolution_clock::now();
     std::ofstream file("knight_problem_points.csv");
     for (const auto& point : points) {
@@ -114,8 +129,7 @@ int main() {
     std::cout << "Largest prime factor for 1000: " << largest_prime_factor_quick(1000) << " seconds" << std::endl;
     
     knight_problem();
-    std::cout << "Number to square: " << number_to_square(7).first << ", " << number_to_square(7).second << std::endl;
-    std::cout << "Square to number: " << square_to_number(std::make_pair(-1, -1)) << std::endl;
-
+    std::cout << square_to_number(std::make_pair(13, 6)) << std::endl;
+    
     return 0;
 }
