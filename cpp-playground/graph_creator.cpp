@@ -41,16 +41,48 @@ double largest_prime_factor_quick(int n) {
 
 }
 
+std::pair<int,int> number_to_square(int x) {
+    int s = floor(sqrt(x));
+    if (s %2 == 1) {
+        if (x == s*s) {
+            return std::make_pair((s-1)/2,-(s-1)/2);
+        }
+        else if (x <= (s*s+s)) {
+            return std::make_pair((s+1)/2,-(s+1)/2+x-(s*s));
+        } else {
+            return std::make_pair((s+3)/2-(x-s*s-s),(s+1)/2);
+        }
+    }
+    else {
+        if (x == s*s) {
+            return std::make_pair(-s/2+1,s/2);
+        }
+        int new_x = -1;
+        if (x == s*s+1) {
+            new_x = x+2*s;
+        }
+        else {
+            new_x = x-2*s;
+        }
+        std::pair<int,int> counter_pair = number_to_square(new_x);
+        return std::make_pair(-counter_pair.first, -counter_pair.second);
+    }
+}
+
 double knight_problem () {
     auto start = std::chrono::high_resolution_clock::now();
     auto points = std::vector<std::pair<int, int>>();
 
-    std::unordered_set<std::pair<int, int>> visited;
+    // std::unordered_set<std::pair<int, int>> visited;
 
-    std::pair<int, int> current_position = {0, 0};
+    // std::pair<int, int> current_position = std::make_pair(0, 0);
 
-    while (true) {
-        
+    // while (true) {
+
+    // }
+
+    for (int number = 1; number <= 100; number++) {
+        points.push_back(number_to_square(number));
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::ofstream file("knight_problem_points.csv");
@@ -64,5 +96,8 @@ int main() {
     // largest_prime_factor_1(1000000);
     std::cout << "Largest prime factor for 1000: " << largest_prime_factor_quick(1000) << " seconds" << std::endl;
     
+    knight_problem();
+
+
     return 0;
 }
