@@ -108,6 +108,10 @@ export function colorSourceValue(
   return Number.isFinite(v) ? v! : null
 }
 
+export function formatColorScaleValue(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toPrecision(4)
+}
+
 export function colorValueExtent(
   rows: CoordinateRow[],
   source: ColorSource,
@@ -132,12 +136,10 @@ function clamp01(t: number): number {
   return Math.max(0, Math.min(1, t))
 }
 
-/** Map a data value to 0–255 using configured bounds (or data extent). */
-export function valueToColorIndex(
-  raw: number,
+export function resolveColorScaleBounds(
   config: ColorConfig,
   extent: { min: number; max: number },
-): number {
+): { min: number; max: number } | null {
   const min =
     config.valueMin != null && Number.isFinite(config.valueMin)
       ? config.valueMin
@@ -147,12 +149,82 @@ export function valueToColorIndex(
       ? config.valueMax
       : extent.max
 
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
-    return 128
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
+    return null
+  }
+  return { min, max }
+}
+
+/**
+ * Clamp only the bound(s) being edited so they stay within the opposing
+ * effective limit (user override or auto extent). Does not modify the other bound.
+ */
+export function reconcileColorScaleOverrides(
+  color: ColorConfig,
+  extent: { min: number; max: number } | null,
+  patch: Partial<Pick<ColorConfig, 'valueMin' | 'valueMax' | 'source'>> = {},
+): Partial<Pick<ColorConfig, 'valueMin' | 'valueMax'>> {
+  const out: Partial<Pick<ColorConfig, 'valueMin' | 'valueMax'>> = {}
+  if (!extent) return out
+
+  const ceiling =
+    color.valueMax != null && Number.isFinite(color.valueMax)
+      ? color.valueMax
+      : extent.max
+  const floor =
+    color.valueMin != null && Number.isFinite(color.valueMin)
+      ? color.valueMin
+      : extent.min
+
+  if (patch.valueMin !== undefined) {
+    let valueMin = patch.valueMin
+    if (valueMin != null && Number.isFinite(valueMin)) {
+      valueMin = Math.min(valueMin, ceiling)
+    }
+    out.valueMin = valueMin
+  } else if (patch.source !== undefined && color.valueMin != null) {
+    if (Number.isFinite(color.valueMin) && color.valueMin > ceiling) {
+      out.valueMin = ceiling
+    }
   }
 
-  const t = clamp01((raw - min) / (max - min))
-  return Math.round(t * 255)
+  if (patch.valueMax !== undefined) {
+    let valueMax = patch.valueMax
+    if (valueMax != null && Number.isFinite(valueMax)) {
+      valueMax = Math.max(valueMax, floor)
+    }
+    out.valueMax = valueMax
+  } else if (patch.source !== undefined && color.valueMax != null) {
+    if (Number.isFinite(color.valueMax) && color.valueMax < floor) {
+      out.valueMax = floor
+    }
+  }
+
+  return out
+}
+
+/** Normalized position along the scale (0 = low color, 1 = high color). */
+export function valueToColorT(
+  raw: number,
+  config: ColorConfig,
+  extent: { min: number; max: number },
+): number {
+  const bounds = resolveColorScaleBounds(config, extent)
+  if (!bounds) return 0.5
+
+  const { min, max } = bounds
+  if (raw <= min) return 0
+  if (raw >= max) return 1
+  return (raw - min) / (max - min)
+}
+
+/** Map a data value to 0–255 using configured bounds (or data extent). */
+export function valueToColorIndex(
+  raw: number,
+  config: ColorConfig,
+  extent: { min: number; max: number },
+): number {
+  return Math.round(valueToColorT(raw, config, extent) * 255)
 }
 
 export function applyCustomColorIndex(
@@ -168,18 +240,6 @@ export function applyCustomColorIndex(
   } catch {
     return v
   }
-}
-
-export function resolveColorIndex(
-  raw: number,
-  config: ColorConfig,
-  extent: { min: number; max: number },
-): number {
-  const linear = valueToColorIndex(raw, config, extent)
-  if (config.mappingMode === 'custom') {
-    return applyCustomColorIndex(linear, config.customExpression)
-  }
-  return linear
 }
 
 type Rgb = { r: number; g: number; b: number }
@@ -222,21 +282,29 @@ function parseCssColor(input: string): Rgb | null {
   }
 }
 
+export function colorFromT(
+  t: number,
+  colorLow: string,
+  colorHigh: string,
+): string {
+  const u = clamp01(t)
+  const low = parseCssColor(colorLow) ?? parseHexColor(colorLow)
+  const high = parseCssColor(colorHigh) ?? parseHexColor(colorHigh)
+  if (!low || !high) {
+    return u < 0.5 ? colorLow : colorHigh
+  }
+  const r = Math.round(low.r + (high.r - low.r) * u)
+  const g = Math.round(low.g + (high.g - low.g) * u)
+  const b = Math.round(low.b + (high.b - low.b) * u)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
 export function colorFromIndex(
   index: number,
   colorLow: string,
   colorHigh: string,
 ): string {
-  const t = clamp01(index / 255)
-  const low = parseCssColor(colorLow) ?? parseHexColor(colorLow)
-  const high = parseCssColor(colorHigh) ?? parseHexColor(colorHigh)
-  if (!low || !high) {
-    return index < 128 ? colorLow : colorHigh
-  }
-  const r = Math.round(low.r + (high.r - low.r) * t)
-  const g = Math.round(low.g + (high.g - low.g) * t)
-  const b = Math.round(low.b + (high.b - low.b) * t)
-  return `rgb(${r}, ${g}, ${b})`
+  return colorFromT(index / 255, colorLow, colorHigh)
 }
 
 export function colorForRow(
@@ -246,8 +314,12 @@ export function colorForRow(
 ): string | undefined {
   const raw = colorSourceValue(row, config.source)
   if (raw === null) return undefined
-  const index = resolveColorIndex(raw, config, extent)
-  return colorFromIndex(index, config.colorLow, config.colorHigh)
+  let t = valueToColorT(raw, config, extent)
+  if (config.mappingMode === 'custom') {
+    const index = applyCustomColorIndex(Math.round(t * 255), config.customExpression)
+    t = index / 255
+  }
+  return colorFromT(t, config.colorLow, config.colorHigh)
 }
 
 export function indexColorByPosition(index: number, total: number): string {

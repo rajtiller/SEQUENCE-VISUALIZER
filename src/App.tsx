@@ -28,6 +28,9 @@ import { normalizeGraphPlan } from './lib/presetCsv'
 import { buildPixelCellFills, withColorSourceForData } from './lib/applyPointColors'
 import {
   coerceColorSource,
+  colorValueExtent,
+  formatColorScaleValue,
+  reconcileColorScaleOverrides,
   type ColorMappingMode,
   type ColorSource,
 } from './lib/colorConfig'
@@ -271,6 +274,7 @@ function App() {
       resolveChartPoints(previewRowsData, graphPlan, cfg, {
         hasZ,
         useRowsAsIs: true,
+        colorExtentRows: previewRowsData,
       }),
     [previewRowsData, graphPlan, cfg, hasZ],
   )
@@ -348,17 +352,35 @@ function App() {
 
   const previewCellFills = useMemo(() => {
     if (!threeDColorOn || !showRectPixels) return undefined
-    return buildPixelCellFills(previewRowsData, graphPlan, hasZ)
+    return buildPixelCellFills(previewRowsData, graphPlan, hasZ, previewRowsData)
   }, [previewRowsData, graphPlan, hasZ, threeDColorOn, showRectPixels])
+
+  /** Auto scale labels: match preview rows so highs/lows reach swatch colors in preview. */
+  const colorAutoExtent = useMemo(() => {
+    if (!threeDColorOn || previewRowsData.length === 0) return null
+    return colorValueExtent(previewRowsData, graphPlan.color.source)
+  }, [threeDColorOn, previewRowsData, graphPlan.color.source])
 
   const patchColor = useCallback(
     (patch: Partial<GraphPlanConfig['color']>) => {
-      setGraphPlan((p) => ({
-        ...p,
-        color: normalizeColorConfig({ ...p.color, ...patch }, hasZ),
-      }))
+      setGraphPlan((p) => {
+        const needsBoundReconcile =
+          patch.valueMin !== undefined ||
+          patch.valueMax !== undefined ||
+          patch.source !== undefined
+        const boundPatch = needsBoundReconcile
+          ? reconcileColorScaleOverrides(p.color, colorAutoExtent, patch)
+          : {}
+        return {
+          ...p,
+          color: normalizeColorConfig(
+            { ...p.color, ...patch, ...boundPatch },
+            hasZ,
+          ),
+        }
+      })
     },
-    [hasZ],
+    [hasZ, colorAutoExtent],
   )
 
   const commitBound = useCallback((key: keyof GraphBounds, n: number) => {
@@ -790,6 +812,11 @@ function App() {
 
               {threeDColorOn && (
                 <div className="color-settings">
+                  <p className="color-settings-warning" role="note">
+                    Preview can differ from Create graph: axis bounds follow preview
+                    points only. Color auto min/max use preview rows; the exported
+                    graph uses the full plot count for its color scale.
+                  </p>
                   <label className="field">
                     <span>Color from</span>
                     <select
@@ -808,24 +835,57 @@ function App() {
                       {hasZ && <option value="z">Z</option>}
                     </select>
                   </label>
-                  <label className="metric">
-                    <span className="metric-label">Value at 0</span>
-                    <DeferredNumberInput
-                      optional
-                      value={graphPlan.color.valueMin}
-                      placeholder="auto (min)"
-                      onCommit={(n) => patchColor({ valueMin: n })}
-                    />
+                  <label className="field color-mapping-field">
+                    <span>Mapping</span>
+                    <select
+                      value={graphPlan.color.mappingMode}
+                      onChange={(e) => {
+                        const mappingMode = e.target
+                          .value as ColorMappingMode
+                        patchColor({
+                          mappingMode,
+                          ...(mappingMode === 'custom'
+                            ? { valueMin: null, valueMax: null }
+                            : {}),
+                        })
+                      }}
+                    >
+                      <option value="linear">Linear (0–255)</option>
+                      <option value="custom">Custom (mod 256)</option>
+                    </select>
                   </label>
-                  <label className="metric">
-                    <span className="metric-label">Value at 255</span>
-                    <DeferredNumberInput
-                      optional
-                      value={graphPlan.color.valueMax}
-                      placeholder="auto (max)"
-                      onCommit={(n) => patchColor({ valueMax: n })}
-                    />
-                  </label>
+                  {graphPlan.color.mappingMode === 'linear' ? (
+                    <div className="color-linear-bounds">
+                      <label className="color-linear-bound">
+                        <span className="metric-label">Value at 0</span>
+                        <DeferredNumberInput
+                          optional
+                          value={graphPlan.color.valueMin}
+                          placeholder={
+                            colorAutoExtent
+                              ? `auto (min: ${formatColorScaleValue(colorAutoExtent.min)})`
+                              : 'auto (min)'
+                          }
+                          onCommit={(n) => patchColor({ valueMin: n })}
+                        />
+                      </label>
+                      <label className="color-linear-bound">
+                        <span className="metric-label">Value at 255</span>
+                        <DeferredNumberInput
+                          optional
+                          value={graphPlan.color.valueMax}
+                          placeholder={
+                            colorAutoExtent
+                              ? `auto (max: ${formatColorScaleValue(colorAutoExtent.max)})`
+                              : 'auto (max)'
+                          }
+                          onCommit={(n) => patchColor({ valueMax: n })}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="color-linear-bounds color-linear-bounds--reserved" aria-hidden />
+                  )}
                   <label className="field color-swatch-field">
                     <span>Low color</span>
                     <input
@@ -853,20 +913,6 @@ function App() {
                         patchColor({ colorHigh: e.target.value })
                       }
                     />
-                  </label>
-                  <label className="field">
-                    <span>Mapping</span>
-                    <select
-                      value={graphPlan.color.mappingMode}
-                      onChange={(e) =>
-                        patchColor({
-                          mappingMode: e.target.value as ColorMappingMode,
-                        })
-                      }
-                    >
-                      <option value="linear">Linear (0–255)</option>
-                      <option value="custom">Custom (mod 256)</option>
-                    </select>
                   </label>
                   {graphPlan.color.mappingMode === 'custom' && (
                     <label className="field color-expr-field">

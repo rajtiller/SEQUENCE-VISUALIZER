@@ -16,12 +16,17 @@ export function applyPointColors(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   hasZ: boolean,
+  /** Rows used for auto min/max (e.g. all plot points, not preview subset). */
+  extentRows?: CoordinateRow[],
 ): ChartPoint[] {
   if (points.length === 0) return points
 
   if (graphPlan.threeD === 'yes-with-color') {
     const config = normalizeColorConfig(graphPlan.color, hasZ)
-    const extent = colorValueExtent(rows, config.source)
+    const extent = colorValueExtent(
+      extentRows ?? rows,
+      config.source,
+    )
     if (!extent) return points
 
     const n = Math.min(points.length, rows.length)
@@ -48,6 +53,7 @@ export function buildPixelCellFills(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   hasZ: boolean,
+  extentRows?: CoordinateRow[],
 ): Map<string, string> {
   const map = new Map<string, string>()
   if (graphPlan.threeD !== 'yes-with-color' || rows.length === 0) {
@@ -55,7 +61,7 @@ export function buildPixelCellFills(
   }
 
   const config = normalizeColorConfig(graphPlan.color, hasZ)
-  const extent = colorValueExtent(rows, config.source)
+  const extent = colorValueExtent(extentRows ?? rows, config.source)
   if (!extent) return map
 
   for (const row of rows) {

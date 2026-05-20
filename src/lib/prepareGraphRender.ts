@@ -37,7 +37,7 @@ export async function prepareGraphRenderData(
   const colorize = (points: ChartPoint[]) =>
     vizConfig.chartKind === 'histogram'
       ? points
-      : applyPointColors(points, graphRows, graphPlan, hasZ)
+      : applyPointColors(points, graphRows, graphPlan, hasZ, graphRows)
 
   if (!shouldShowGraphProgress(coordinateRows.length)) {
     return prepareGraphRenderDataSync(payload, graphRows, hasZ)
@@ -107,7 +107,7 @@ function prepareGraphRenderDataSync(
   const colorize = (points: ChartPoint[]) =>
     vizConfig.chartKind === 'histogram'
       ? points
-      : applyPointColors(points, graphRows, graphPlan, hasZ)
+      : applyPointColors(points, graphRows, graphPlan, hasZ, graphRows)
 
   if (showRectPixels) {
     return { allPoints: [], graphRows }

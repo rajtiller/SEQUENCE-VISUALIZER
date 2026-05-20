@@ -69,6 +69,22 @@ std::pair<int,int> number_to_square(int x) {
     }
 }
 
+int square_to_number(std::pair<int,int> square) {
+    int x = square.first;
+    int y = square.second;
+    int k = max(abs(x), abs(y));
+    int s = 2*k+1;
+    if (y == -k) {
+        return s*s-(k-x);
+    } else if (x == -k) {
+        return s*s-(s-1)-(k+y);
+    } else if (y == k) {
+        return s*s-2*(s-1)-(k+x);
+    } else {
+        return s*s-3*(s-1)-(k-y);
+    }
+}
+
 double knight_problem () {
     auto start = std::chrono::high_resolution_clock::now();
     auto points = std::vector<std::pair<int, int>>();
@@ -82,7 +98,8 @@ double knight_problem () {
     // }
 
     for (int number = 1; number <= 100; number++) {
-        points.push_back(number_to_square(number));
+        std::cout << number << " " << square_to_number(number_to_square(number)) << std::endl;
+        // points.push_back(number_to_square(number));
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::ofstream file("knight_problem_points.csv");
@@ -97,7 +114,8 @@ int main() {
     std::cout << "Largest prime factor for 1000: " << largest_prime_factor_quick(1000) << " seconds" << std::endl;
     
     knight_problem();
-
+    std::cout << "Number to square: " << number_to_square(7).first << ", " << number_to_square(7).second << std::endl;
+    std::cout << "Square to number: " << square_to_number(std::make_pair(-1, -1)) << std::endl;
 
     return 0;
 }

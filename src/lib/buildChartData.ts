@@ -64,10 +64,17 @@ export function resolveChartPoints(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   cfg: VizConfig,
-  options?: { hasZ?: boolean; useRowsAsIs?: boolean },
+  options?: {
+    hasZ?: boolean
+    useRowsAsIs?: boolean
+    /** Auto color scale min/max from these rows (defaults to plotted slice). */
+    colorExtentRows?: CoordinateRow[]
+  },
 ): ChartPoint[] {
   const slice = options?.useRowsAsIs ? rows : plotRows(rows, graphPlan)
   if (slice.length === 0) return []
+
+  const colorExtentRows = options?.colorExtentRows ?? slice
 
   const hasZ =
     options?.hasZ ??
@@ -88,7 +95,7 @@ export function resolveChartPoints(
 
   if (cfg.chartKind === 'histogram') return points
 
-  return applyPointColors(points, slice, graphPlan, hasZ)
+  return applyPointColors(points, slice, graphPlan, hasZ, colorExtentRows)
 }
 
 export function rowsForGraph(
@@ -110,7 +117,11 @@ export function resolveGraphViewPoints(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   cfg: VizConfig,
-  options?: { hasZ?: boolean; useRowsAsIs?: boolean },
+  options?: {
+    hasZ?: boolean
+    useRowsAsIs?: boolean
+    colorExtentRows?: CoordinateRow[]
+  },
 ): ChartPoint[] {
   return resolveChartPoints(rows, graphPlan, cfg, options)
 }
