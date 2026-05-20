@@ -1,4 +1,9 @@
 import type { ChartPoint } from '../components/DataChart'
+import {
+  defaultRectBounds,
+  normalizeGraphBounds,
+  type GraphBounds,
+} from './graphPlanConfig'
 import type { CoordinateRow } from './parseCsv'
 import type { HistogramSource } from './vizConfig'
 
@@ -102,4 +107,49 @@ function formatBinLabel(start: number, end: number): string {
   const fmt = (n: number) =>
     Number.isInteger(n) ? String(n) : n.toPrecision(4)
   return `${fmt(start)}–${fmt(end)}`
+}
+
+/** Chart axes for histogram preview: X = binned values, Y = counts (from 0). */
+export function suggestHistogramBounds(
+  rows: CoordinateRow[],
+  source: HistogramSource,
+  interval: number,
+): GraphBounds {
+  const width = interval
+  if (!Number.isFinite(width) || width <= 0) return defaultRectBounds()
+
+  const values = rows
+    .map((r) => (source === 'x' ? r.x : r.y))
+    .filter((v) => Number.isFinite(v))
+  if (values.length === 0) return defaultRectBounds()
+
+  let dataMin = Infinity
+  let dataMax = -Infinity
+  for (const v of values) {
+    if (v < dataMin) dataMin = v
+    if (v > dataMax) dataMax = v
+  }
+  if (dataMin === dataMax) {
+    dataMin -= width / 2
+    dataMax += width / 2
+  }
+
+  const xMin = Math.floor(dataMin / width) * width
+  const xMax = Math.ceil(dataMax / width) * width
+  const bins = computeHistogramBins(values, {
+    interval: width,
+    domainMin: xMin,
+    domainMax: xMax,
+  })
+
+  let maxCount = 0
+  for (const b of bins) maxCount = Math.max(maxCount, b.count)
+  const countPad = Math.max(1, Math.ceil(maxCount * 0.1))
+
+  return normalizeGraphBounds({
+    xMin,
+    xMax,
+    yMin: 0,
+    yMax: maxCount + countPad,
+  })
 }

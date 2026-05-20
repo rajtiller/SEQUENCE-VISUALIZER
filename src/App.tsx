@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { DataChart } from './components/DataChart'
 import { DeferredNumberInput } from './components/DeferredNumberInput'
 import { ListFileInput } from './components/ListFileInput'
@@ -19,11 +19,11 @@ import {
   defaultPreviewPointCount,
   normalizeGraphBounds,
   sliceToPointLimit,
-  suggestGraphBounds,
   type CoordinateSystem,
   type GraphBounds,
   type GraphPlanConfig,
 } from './lib/graphPlanConfig'
+import { suggestPreviewBounds } from './lib/previewBounds'
 import {
   plotRows,
   previewRows,
@@ -57,13 +57,6 @@ function App() {
     defaultGraphPlanConfig(),
   )
 
-  const applyBoundsFromRows = useCallback((rows: CoordinateRow[]) => {
-    setGraphPlan((p) => ({
-      ...p,
-      bounds: suggestGraphBounds(rows, p.coordinateSystem),
-    }))
-  }, [])
-
   const applyTable = useCallback(
     (text: string, name: string | null) => {
       setParseError(null)
@@ -92,9 +85,10 @@ function App() {
             ...p,
             previewPointCount: previewN,
             pointCount: null,
-            bounds: suggestGraphBounds(
+            bounds: suggestPreviewBounds(
               sliceToPointLimit(parsed.rows, previewN),
               p.coordinateSystem,
+              cfg,
             ),
           }))
         }
@@ -105,7 +99,7 @@ function App() {
         setFileName(name)
       }
     },
-    [applyBoundsFromRows],
+    [cfg],
   )
 
   const applyListFile = useCallback(
@@ -135,9 +129,10 @@ function App() {
             return {
               ...gp,
               previewPointCount: previewN,
-              bounds: suggestGraphBounds(
+              bounds: suggestPreviewBounds(
                 sliceToPointLimit(merged.rows, previewN),
                 gp.coordinateSystem,
+                cfg,
               ),
             }
           })
@@ -145,7 +140,7 @@ function App() {
         return next
       })
     },
-    [applyBoundsFromRows],
+    [cfg],
   )
 
   const clearList = useCallback((key: 'x' | 'y' | 'z') => {
@@ -199,6 +194,23 @@ function App() {
     () => previewRows(coordinateRows, graphPlan),
     [coordinateRows, graphPlan.previewPointCount],
   )
+
+  useEffect(() => {
+    if (cfg.chartKind !== 'histogram' || previewRowsData.length === 0) return
+    setGraphPlan((p) => ({
+      ...p,
+      bounds: suggestPreviewBounds(
+        previewRowsData,
+        p.coordinateSystem,
+        cfg,
+      ),
+    }))
+  }, [
+    cfg.chartKind,
+    cfg.histogramSource,
+    cfg.histogramInterval,
+    previewRowsData,
+  ])
 
   const onFile = useCallback(
     (file: File | null) => {
@@ -303,12 +315,12 @@ function App() {
           previewPointCount: previewCount,
           bounds:
             rows.length > 0
-              ? suggestGraphBounds(rows, p.coordinateSystem)
+              ? suggestPreviewBounds(rows, p.coordinateSystem, cfg)
               : p.bounds,
         }
       })
     },
-    [coordinateRows],
+    [coordinateRows, cfg],
   )
 
   const isPolar = graphPlan.coordinateSystem === 'polar'
@@ -486,12 +498,29 @@ function App() {
                 <span>Preview</span>
                 <select
                   value={cfg.chartKind}
-                  onChange={(e) =>
-                    setCfg((c) => ({
-                      ...c,
-                      chartKind: e.target.value as VizConfig['chartKind'],
-                    }))
-                  }
+                  onChange={(e) => {
+                    const chartKind = e.target.value as VizConfig['chartKind']
+                    setCfg((c) => {
+                      const next = { ...c, chartKind }
+                      setGraphPlan((p) => {
+                        const rows = sliceToPointLimit(
+                          coordinateRows,
+                          p.previewPointCount,
+                        )
+                        return rows.length > 0
+                          ? {
+                              ...p,
+                              bounds: suggestPreviewBounds(
+                                rows,
+                                p.coordinateSystem,
+                                next,
+                              ),
+                            }
+                          : p
+                      })
+                      return next
+                    })
+                  }}
                 >
                   <option value="line">Line</option>
                   <option value="scatter">Scatter</option>
@@ -583,12 +612,13 @@ function App() {
                       usePixels: system === 'polar' ? false : p.usePixels,
                       bounds:
                         coordinateRows.length > 0
-                          ? suggestGraphBounds(
+                          ? suggestPreviewBounds(
                               sliceToPointLimit(
                                 coordinateRows,
                                 p.previewPointCount,
                               ),
                               system,
+                              cfg,
                             )
                           : defaultGraphBounds(system),
                     }))
