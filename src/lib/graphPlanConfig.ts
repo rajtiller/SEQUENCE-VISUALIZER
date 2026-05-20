@@ -30,8 +30,10 @@ export type GraphPlanConfig = {
   multicolored: MulticoloredChoice
   bounds: GraphBounds
   inputScaleType: InputScaleTypeChoice
-  /** First n rows to plot; null = all points. */
+  /** First n rows to plot (preview + export); null = all points. */
   pointCount: number | null
+  /** First n rows for preview chart; null = all loaded rows. Bounds follow preview. */
+  previewPointCount: number | null
   pointsLayout: PointsLayoutChoice
 }
 
@@ -137,6 +139,14 @@ export function normalizeGraphBounds(
   return { xMin, xMax, yMin, yMax }
 }
 
+export const DEFAULT_PREVIEW_POINT_CAP = 500
+
+/** Default preview size: min(500, total rows). */
+export function defaultPreviewPointCount(rowCount: number): number {
+  if (rowCount <= 0) return 0
+  return Math.min(DEFAULT_PREVIEW_POINT_CAP, rowCount)
+}
+
 export function defaultGraphPlanConfig(): GraphPlanConfig {
   return {
     coordinateSystem: 'rectangular',
@@ -148,15 +158,16 @@ export function defaultGraphPlanConfig(): GraphPlanConfig {
     bounds: defaultRectBounds(),
     inputScaleType: 'linear',
     pointCount: null,
+    previewPointCount: null,
     pointsLayout: 'rows-xy',
   }
 }
 
 /** Keep the first n rows when limited; otherwise return all rows. */
-export function sliceToPointLimit(
-  rows: { x: number; y: number }[],
+export function sliceToPointLimit<T extends { x: number; y: number }>(
+  rows: T[],
   pointCount: number | null,
-): typeof rows {
+): T[] {
   if (pointCount == null || !Number.isFinite(pointCount) || pointCount <= 0) {
     return rows
   }

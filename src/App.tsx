@@ -16,13 +16,19 @@ import { parseCsvWithPreset } from './lib/presetCsv'
 import {
   defaultGraphBounds,
   defaultGraphPlanConfig,
+  defaultPreviewPointCount,
   normalizeGraphBounds,
+  sliceToPointLimit,
   suggestGraphBounds,
   type CoordinateSystem,
   type GraphBounds,
   type GraphPlanConfig,
 } from './lib/graphPlanConfig'
-import { plotRows, resolveChartPoints } from './lib/buildChartData'
+import {
+  plotRows,
+  previewRows,
+  resolveChartPoints,
+} from './lib/buildChartData'
 import {
   openGraphInNewTab,
   saveGraphExportAsync,
@@ -81,7 +87,16 @@ function App() {
           setGraphPlan(parsed.preset.graphPlan)
           setCfg(parsed.preset.vizConfig)
         } else {
-          applyBoundsFromRows(parsed.rows)
+          const previewN = defaultPreviewPointCount(parsed.rows.length)
+          setGraphPlan((p) => ({
+            ...p,
+            previewPointCount: previewN,
+            pointCount: null,
+            bounds: suggestGraphBounds(
+              sliceToPointLimit(parsed.rows, previewN),
+              p.coordinateSystem,
+            ),
+          }))
         }
       } catch (e) {
         setParseError(e instanceof Error ? e.message : 'Could not parse CSV.')
@@ -112,7 +127,21 @@ function App() {
           next.z.values.length > 0 ? next.z.values : undefined,
         )
         setListWarning(merged.error)
-        if (merged.rows.length > 0) applyBoundsFromRows(merged.rows)
+        if (merged.rows.length > 0) {
+          setGraphPlan((gp) => {
+            const previewN =
+              gp.previewPointCount ??
+              defaultPreviewPointCount(merged.rows.length)
+            return {
+              ...gp,
+              previewPointCount: previewN,
+              bounds: suggestGraphBounds(
+                sliceToPointLimit(merged.rows, previewN),
+                gp.coordinateSystem,
+              ),
+            }
+          })
+        }
         return next
       })
     },
@@ -166,6 +195,11 @@ function App() {
     [coordinateRows, graphPlan.pointCount],
   )
 
+  const previewRowsData = useMemo(
+    () => previewRows(coordinateRows, graphPlan),
+    [coordinateRows, graphPlan.previewPointCount],
+  )
+
   const onFile = useCallback(
     (file: File | null) => {
       if (!file) return
@@ -206,9 +240,9 @@ function App() {
     e.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  const points = useMemo(
-    () => resolveChartPoints(coordinateRows, graphPlan, cfg),
-    [coordinateRows, graphPlan, cfg],
+  const previewPoints = useMemo(
+    () => resolveChartPoints(previewRowsData, graphPlan, cfg),
+    [previewRowsData, graphPlan, cfg],
   )
 
   const canCreateGraph = plotRowsData.length > 0
@@ -254,9 +288,27 @@ function App() {
     createGraphProgress,
   ])
 
-  const previewRows = useMemo(
-    () => plotRowsData.slice(0, PREVIEW_ROW_COUNT),
-    [plotRowsData],
+  const previewTableRows = useMemo(
+    () => previewRowsData.slice(0, PREVIEW_ROW_COUNT),
+    [previewRowsData],
+  )
+
+  const commitPreviewPointCount = useCallback(
+    (n: number | null) => {
+      const previewCount = n != null && n > 0 ? Math.floor(n) : null
+      setGraphPlan((p) => {
+        const rows = sliceToPointLimit(coordinateRows, previewCount)
+        return {
+          ...p,
+          previewPointCount: previewCount,
+          bounds:
+            rows.length > 0
+              ? suggestGraphBounds(rows, p.coordinateSystem)
+              : p.bounds,
+        }
+      })
+    },
+    [coordinateRows],
   )
 
   const isPolar = graphPlan.coordinateSystem === 'polar'
@@ -361,19 +413,27 @@ function App() {
 
           {coordinateRows.length > 0 && (
             <p className="viz-meta">
-              {plotRowsData.length.toLocaleString()} plotted
-              {graphPlan.pointCount != null &&
-              plotRowsData.length < coordinateRows.length
+              {previewRowsData.length.toLocaleString()} in preview
+              {graphPlan.previewPointCount != null &&
+              previewRowsData.length < coordinateRows.length
                 ? ` of ${coordinateRows.length.toLocaleString()}`
                 : ''}
+              {plotRowsData.length !== previewRowsData.length
+                ? ` · ${plotRowsData.length.toLocaleString()} plotted`
+                : ''}
+              {graphPlan.pointCount != null &&
+              plotRowsData.length < coordinateRows.length
+                ? ` (cap ${graphPlan.pointCount.toLocaleString()})`
+                : ''}
               {hasZ ? ' · z' : ''}
-              {previewRows.length > 0 && previewRows.length <= PREVIEW_ROW_COUNT
-                ? ` · first ${previewRows.length} below`
+              {previewTableRows.length > 0 &&
+              previewTableRows.length <= PREVIEW_ROW_COUNT
+                ? ` · first ${previewTableRows.length} in table`
                 : ''}
             </p>
           )}
 
-          {previewRows.length > 0 && (
+          {previewTableRows.length > 0 && (
             <div className="table-wrap">
               <table className="preview-table">
                 <thead>
@@ -384,7 +444,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {previewRows.map((row, i) => (
+                  {previewTableRows.map((row, i) => (
                     <tr key={i}>
                       <td>{row.x}</td>
                       <td>{row.y}</td>
@@ -403,13 +463,13 @@ function App() {
           <div className="chart-wrap">
             {showRectPixels ? (
               <PixelGridChart
-                rows={plotRowsData}
+                rows={previewRowsData}
                 bounds={graphPlan.bounds}
                 showGrid={showGrid}
               />
             ) : (
               <DataChart
-                points={points}
+                points={previewPoints}
                 kind={cfg.chartKind}
                 showGrid={showGrid}
                 strokeWidth={cfg.strokeWidth}
@@ -523,7 +583,13 @@ function App() {
                       usePixels: system === 'polar' ? false : p.usePixels,
                       bounds:
                         coordinateRows.length > 0
-                          ? suggestGraphBounds(coordinateRows, system)
+                          ? suggestGraphBounds(
+                              sliceToPointLimit(
+                                coordinateRows,
+                                p.previewPointCount,
+                              ),
+                              system,
+                            )
                           : defaultGraphBounds(system),
                     }))
                   }}
@@ -568,7 +634,19 @@ function App() {
               </label>
 
               <label className="field">
-                <span>First n points</span>
+                <span>Preview n points</span>
+                <DeferredNumberInput
+                  optional
+                  integer
+                  placeholder="all"
+                  value={graphPlan.previewPointCount}
+                  min={1}
+                  onCommit={commitPreviewPointCount}
+                />
+              </label>
+
+              <label className="field">
+                <span>Plot n points</span>
                 <DeferredNumberInput
                   optional
                   integer

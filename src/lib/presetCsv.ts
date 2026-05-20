@@ -77,6 +77,16 @@ export function normalizeGraphPlan(
     pointCount = Math.floor(value.pointCount!)
   }
 
+  let previewPointCount: number | null = d.previewPointCount
+  if (value.previewPointCount === null) {
+    previewPointCount = null
+  } else if (
+    Number.isFinite(value.previewPointCount) &&
+    value.previewPointCount! > 0
+  ) {
+    previewPointCount = Math.floor(value.previewPointCount!)
+  }
+
   return {
     coordinateSystem,
     usePixels: Boolean(value.usePixels),
@@ -90,6 +100,7 @@ export function normalizeGraphPlan(
     ),
     inputScaleType,
     pointCount,
+    previewPointCount,
     pointsLayout: 'rows-xy',
   }
 }

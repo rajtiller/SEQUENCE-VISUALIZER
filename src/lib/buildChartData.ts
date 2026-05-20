@@ -17,6 +17,13 @@ export function plotRows(
   return sliceToPointLimit(rows, graphPlan.pointCount)
 }
 
+export function previewRows(
+  rows: CoordinateRow[],
+  graphPlan: GraphPlanConfig,
+): CoordinateRow[] {
+  return sliceToPointLimit(rows, graphPlan.previewPointCount)
+}
+
 export function buildChartPoints(
   rows: CoordinateRow[],
   cfg: VizConfig,
