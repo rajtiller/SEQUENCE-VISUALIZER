@@ -1,5 +1,10 @@
 /** Settings from `cpp-playground/planning.txt` (UI only until “Create graph” is wired). */
 
+import { defaultColorConfig, type ColorConfig } from './colorConfig'
+
+export type { ColorConfig, ColorMappingMode, ColorSource } from './colorConfig'
+export { normalizeColorConfig } from './colorConfig'
+
 export type CoordinateSystem = 'rectangular' | 'polar'
 
 export type GridLinesChoice = 'yes' | 'no'
@@ -28,6 +33,8 @@ export type GraphPlanConfig = {
   pointsPerSecond: number | null
   threeD: ThreeDChoice
   multicolored: MulticoloredChoice
+  /** Color mapping when `threeD` is yes-with-color. */
+  color: ColorConfig
   bounds: GraphBounds
   inputScaleType: InputScaleTypeChoice
   /** First n rows to plot (preview + export); null = all points. */
@@ -155,6 +162,7 @@ export function defaultGraphPlanConfig(): GraphPlanConfig {
     pointsPerSecond: null,
     threeD: 'no',
     multicolored: 'no',
+    color: defaultColorConfig(false),
     bounds: defaultRectBounds(),
     inputScaleType: 'linear',
     pointCount: null,

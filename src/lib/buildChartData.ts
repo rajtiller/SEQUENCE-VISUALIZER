@@ -9,6 +9,7 @@ import {
 import { rowsToCartesianPoints } from './polarGrid'
 import { buildHistogramChartPoints } from './histogram'
 import type { VizConfig } from './vizConfig'
+import { applyPointColors } from './applyPointColors'
 
 export function plotRows(
   rows: CoordinateRow[],
@@ -63,22 +64,31 @@ export function resolveChartPoints(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   cfg: VizConfig,
+  options?: { hasZ?: boolean; useRowsAsIs?: boolean },
 ): ChartPoint[] {
-  const slice = plotRows(rows, graphPlan)
+  const slice = options?.useRowsAsIs ? rows : plotRows(rows, graphPlan)
   if (slice.length === 0) return []
 
-  if (cfg.chartKind === 'histogram') {
-    return buildChartPoints(slice, cfg, graphPlan.bounds)
-  }
+  const hasZ =
+    options?.hasZ ??
+    slice.some((r) => r.z !== undefined && Number.isFinite(r.z))
 
-  if (graphPlan.coordinateSystem === 'polar') {
-    return rowsToCartesianPoints(slice).map((p, i) => ({
+  let points: ChartPoint[]
+
+  if (cfg.chartKind === 'histogram') {
+    points = buildChartPoints(slice, cfg, graphPlan.bounds)
+  } else if (graphPlan.coordinateSystem === 'polar') {
+    points = rowsToCartesianPoints(slice).map((p, i) => ({
       ...p,
       label: String(slice[i].x),
     }))
+  } else {
+    points = buildChartPoints(slice, cfg, graphPlan.bounds)
   }
 
-  return buildChartPoints(slice, cfg, graphPlan.bounds)
+  if (cfg.chartKind === 'histogram') return points
+
+  return applyPointColors(points, slice, graphPlan, hasZ)
 }
 
 export function rowsForGraph(
@@ -100,8 +110,9 @@ export function resolveGraphViewPoints(
   rows: CoordinateRow[],
   graphPlan: GraphPlanConfig,
   cfg: VizConfig,
+  options?: { hasZ?: boolean; useRowsAsIs?: boolean },
 ): ChartPoint[] {
-  return resolveChartPoints(rows, graphPlan, cfg)
+  return resolveChartPoints(rows, graphPlan, cfg, options)
 }
 
 export { isAllAtOnceDisplay }

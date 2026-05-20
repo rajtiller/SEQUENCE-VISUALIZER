@@ -1,6 +1,7 @@
 import type { CoordinateRow } from './parseCsv'
 import { parseCoordinateCsv } from './parseCsv'
 import type { GraphExportPayload } from './graphExport'
+import { normalizeColorConfig } from './colorConfig'
 import {
   defaultGraphPlanConfig,
   normalizeGraphBounds,
@@ -35,9 +36,11 @@ const SCALE_TYPES: InputScaleTypeChoice[] = ['linear', 'logarithmic', 'polynomia
 
 export function normalizeGraphPlan(
   value: Partial<GraphPlanConfig> | null | undefined,
+  options?: { hasZ?: boolean },
 ): GraphPlanConfig {
   const d = defaultGraphPlanConfig()
   if (!value) return d
+  const hasZ = options?.hasZ ?? true
 
   const coordinateSystem = COORD_SYSTEMS.includes(
     value.coordinateSystem as CoordinateSystem,
@@ -94,6 +97,7 @@ export function normalizeGraphPlan(
     pointsPerSecond,
     threeD,
     multicolored,
+    color: normalizeColorConfig(value.color, hasZ),
     bounds: normalizeGraphBounds(
       value.bounds ?? d.bounds,
       coordinateSystem,
@@ -184,9 +188,12 @@ export function parseCsvWithPreset(text: string): ParsedCsvWithPreset {
 }
 
 export function buildPresetCsvText(payload: GraphExportPayload): string {
+  const hasZ = payload.coordinateRows.some(
+    (r) => r.z !== undefined && Number.isFinite(r.z),
+  )
   const preset: SequenceVizPreset = {
     version: 1,
-    graphPlan: normalizeGraphPlan(payload.graphPlan),
+    graphPlan: normalizeGraphPlan(payload.graphPlan, { hasZ }),
     vizConfig: normalizeVizConfig(payload.vizConfig),
   }
 

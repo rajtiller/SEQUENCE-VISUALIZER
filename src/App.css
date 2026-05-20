@@ -358,6 +358,50 @@
   margin: 0;
 }
 
+.color-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 88%, var(--accent) 12%);
+}
+
+.color-swatch-field input[type='color'] {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.color-expr-field {
+  grid-column: 1 / -1;
+}
+
+.color-expr-input {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  width: 100%;
+}
+
+.field-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text);
+  margin-top: 4px;
+}
+
 .create-graph-row {
   display: flex;
   flex-wrap: wrap;

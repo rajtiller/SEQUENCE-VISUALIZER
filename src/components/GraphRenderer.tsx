@@ -8,6 +8,7 @@ import {
   plotRows,
   resolveGraphViewPoints,
 } from '../lib/buildChartData'
+import { buildPixelCellFills } from '../lib/applyPointColors'
 import { normalizeGraphBounds } from '../lib/graphPlanConfig'
 import { normalizeVizConfig } from '../lib/vizConfig'
 
@@ -29,15 +30,28 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
     graphPlan.coordinateSystem,
   )
 
-  const allPoints = useMemo(() => {
-    if (prepared) return prepared.allPoints
-    return resolveGraphViewPoints(coordinateRows, graphPlan, vizConfig)
-  }, [prepared, coordinateRows, graphPlan, vizConfig])
+  const hasZ = useMemo(
+    () =>
+      coordinateRows.some((r) => r.z !== undefined && Number.isFinite(r.z)),
+    [coordinateRows],
+  )
 
   const graphRows = useMemo(() => {
     if (prepared) return prepared.graphRows
     return plotRows(coordinateRows, graphPlan)
-  }, [prepared, coordinateRows])
+  }, [prepared, coordinateRows, graphPlan.pointCount])
+
+  const allPoints = useMemo(() => {
+    if (prepared) return prepared.allPoints
+    return resolveGraphViewPoints(coordinateRows, graphPlan, vizConfig, {
+      hasZ,
+    })
+  }, [prepared, coordinateRows, graphPlan, vizConfig, hasZ])
+
+  const cellFills = useMemo(() => {
+    if (graphPlan.threeD !== 'yes-with-color') return undefined
+    return buildPixelCellFills(graphRows, graphPlan, hasZ)
+  }, [graphRows, graphPlan, hasZ])
 
   const animate = !isAllAtOnceDisplay(graphPlan.pointsPerSecond)
   const [visibleCount, setVisibleCount] = useState(() =>
@@ -87,6 +101,7 @@ export function GraphRenderer({ payload, width, height, prepared }: Props) {
         width={width}
         height={height}
         filledCells={prepared?.filledCells}
+        cellFills={cellFills}
       />
     )
   }

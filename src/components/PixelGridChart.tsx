@@ -17,6 +17,8 @@ type Props = {
   height?: number
   /** Pre-built on large graphs so the view can show progress while preparing. */
   filledCells?: FilledCellsModel
+  /** Cell key `gx,gy` → fill color when 3D coloring is on. */
+  cellFills?: ReadonlyMap<string, string>
 }
 
 const DEFAULT_W = 560
@@ -39,6 +41,7 @@ export function PixelGridChart({
   width = DEFAULT_W,
   height = DEFAULT_H,
   filledCells: filledCellsProp,
+  cellFills,
 }: Props) {
   const W = width
   const H = height
@@ -91,6 +94,9 @@ export function PixelGridChart({
       occupied.filter(({ gx, gy }) => isCellInBounds(gx, gy, bounds)),
     [occupied, bounds],
   )
+
+  const fillForCell = (gx: number, gy: number) =>
+    cellFills?.get(`${gx},${gy}`) ?? 'var(--accent)'
 
   if (invalidBounds) {
     return (
@@ -194,7 +200,7 @@ export function PixelGridChart({
               y={cellTop(gy)}
               width={cellW}
               height={cellH}
-              fill={filled ? 'var(--accent)' : 'transparent'}
+              fill={filled ? fillForCell(gx, gy) : 'transparent'}
               stroke="var(--border)"
               strokeWidth={0.5}
               opacity={filled ? 0.9 : 0.35}
@@ -210,7 +216,7 @@ export function PixelGridChart({
             y={cellTop(gy)}
             width={cellW}
             height={cellH}
-            fill="var(--accent)"
+            fill={fillForCell(gx, gy)}
             opacity={0.9}
           />
         ))}

@@ -6,6 +6,8 @@ export type ChartPoint = {
   y: number
   z?: number
   label: string
+  /** SVG fill/stroke when 3D color or multicolor is enabled. */
+  fill?: string
   /** Histogram bin edges (value axis); bars render flush from start to end. */
   binStart?: number
   binEnd?: number
@@ -257,7 +259,28 @@ export function DataChart({
         strokeWidth="1"
       />
 
-      {kind === 'line' && points.length > 1 && (
+      {kind === 'line' &&
+        points.length > 1 &&
+        points.some((p) => p.fill) &&
+        points.map((p, i) => {
+          if (i === 0) return null
+          const prev = points[i - 1]
+          const stroke = p.fill ?? prev.fill ?? 'var(--accent)'
+          return (
+            <line
+              key={`seg-${i}`}
+              x1={sxNumeric(prev.x)}
+              y1={sy(prev.y)}
+              x2={sxNumeric(p.x)}
+              y2={sy(p.y)}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+            />
+          )
+        })}
+
+      {kind === 'line' && points.length > 1 && !points.some((p) => p.fill) && (
         <path
           d={linePath}
           fill="none"
@@ -268,6 +291,21 @@ export function DataChart({
         />
       )}
 
+      {kind === 'line' &&
+        points.map((p, i) =>
+          p.fill ? (
+            <circle
+              key={`lp-${i}`}
+              cx={sxNumeric(p.x)}
+              cy={sy(p.y)}
+              r={pointRadius}
+              fill={p.fill}
+              stroke="var(--chart-bg)"
+              strokeWidth="1"
+            />
+          ) : null,
+        )}
+
       {kind === 'scatter' &&
         points.map((p, i) => (
           <circle
@@ -275,7 +313,7 @@ export function DataChart({
             cx={sxNumeric(p.x)}
             cy={sy(p.y)}
             r={pointRadius}
-            fill="var(--accent)"
+            fill={p.fill ?? 'var(--accent)'}
             stroke="var(--chart-bg)"
             strokeWidth="1"
           />
@@ -295,7 +333,7 @@ export function DataChart({
               y={top}
               width={barWidth}
               height={Math.max(barHeight, 1)}
-              fill="var(--accent)"
+              fill={p.fill ?? 'var(--accent)'}
               opacity={0.85}
             />
           )
@@ -320,7 +358,7 @@ export function DataChart({
               y={top}
               width={flushWidth}
               height={Math.max(barHeight, 1)}
-              fill="var(--accent)"
+              fill={p.fill ?? 'var(--accent)'}
               opacity={0.85}
             />
           )

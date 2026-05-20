@@ -1,5 +1,6 @@
 import type { CoordinateRow } from './parseCsv'
 import type { GraphPlanConfig } from './graphPlanConfig'
+import { normalizeGraphPlan } from './presetCsv'
 import { normalizeVizConfig, type VizConfig } from './vizConfig'
 import { yieldToMain } from './yieldToMain'
 
@@ -11,8 +12,12 @@ export type GraphExportPayload = {
 }
 
 function normalizePayload(payload: GraphExportPayload): GraphExportPayload {
+  const hasZ = payload.coordinateRows.some(
+    (r) => r.z !== undefined && Number.isFinite(r.z),
+  )
   return {
     ...payload,
+    graphPlan: normalizeGraphPlan(payload.graphPlan, { hasZ }),
     vizConfig: normalizeVizConfig(payload.vizConfig),
   }
 }

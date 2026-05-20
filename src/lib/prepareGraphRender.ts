@@ -2,6 +2,7 @@ import type { ChartPoint } from '../components/DataChart'
 import type { FilledCellsModel } from './pixelGrid'
 import { buildFilledCellsAsync } from './pixelGrid'
 import type { CoordinateRow } from './parseCsv'
+import { applyPointColors } from './applyPointColors'
 import { buildChartPoints, plotRows } from './buildChartData'
 import type { GraphExportPayload } from './graphExport'
 import { shouldShowGraphProgress } from './graphExport'
@@ -26,12 +27,20 @@ export async function prepareGraphRenderData(
   const { coordinateRows, graphPlan } = payload
   const vizConfig = normalizeVizConfig(payload.vizConfig)
   const graphRows = plotRows(coordinateRows, graphPlan)
+  const hasZ = coordinateRows.some(
+    (r) => r.z !== undefined && Number.isFinite(r.z),
+  )
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
   const n = graphRows.length
 
+  const colorize = (points: ChartPoint[]) =>
+    vizConfig.chartKind === 'histogram'
+      ? points
+      : applyPointColors(points, graphRows, graphPlan, hasZ)
+
   if (!shouldShowGraphProgress(coordinateRows.length)) {
-    return prepareGraphRenderDataSync(payload, graphRows)
+    return prepareGraphRenderDataSync(payload, graphRows, hasZ)
   }
 
   if (showRectPixels) {
@@ -82,17 +91,23 @@ export async function prepareGraphRenderData(
   }
 
   onProgress(1, 'Ready')
-  return { allPoints, graphRows }
+  return { allPoints: colorize(allPoints), graphRows }
 }
 
 function prepareGraphRenderDataSync(
   payload: GraphExportPayload,
   graphRows: CoordinateRow[],
+  hasZ: boolean,
 ): PreparedGraphRender {
   const { graphPlan } = payload
   const vizConfig = normalizeVizConfig(payload.vizConfig)
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
+
+  const colorize = (points: ChartPoint[]) =>
+    vizConfig.chartKind === 'histogram'
+      ? points
+      : applyPointColors(points, graphRows, graphPlan, hasZ)
 
   if (showRectPixels) {
     return { allPoints: [], graphRows }
@@ -106,17 +121,17 @@ function prepareGraphRenderDataSync(
   }
 
   if (isPolar) {
-    return {
-      allPoints: rowsToCartesianPoints(graphRows).map((p, i) => ({
-        ...p,
-        label: String(graphRows[i].x),
-      })),
-      graphRows,
-    }
+    const points = rowsToCartesianPoints(graphRows).map((p, i) => ({
+      ...p,
+      label: String(graphRows[i].x),
+    }))
+    return { allPoints: colorize(points), graphRows }
   }
 
   return {
-    allPoints: buildChartPoints(graphRows, vizConfig, graphPlan.bounds),
+    allPoints: colorize(
+      buildChartPoints(graphRows, vizConfig, graphPlan.bounds),
+    ),
     graphRows,
   }
 }

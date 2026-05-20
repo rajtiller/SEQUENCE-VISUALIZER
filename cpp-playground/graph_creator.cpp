@@ -5,7 +5,7 @@
 #include <cassert>
 #include <set>
 #include <chrono>
-
+#include <unordered_set>
 
 int max(int a, int b) {
     return a > b ? a : b;
@@ -39,6 +39,25 @@ double largest_prime_factor_quick(int n) {
     }
     return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+}
+
+double knight_problem () {
+    auto start = std::chrono::high_resolution_clock::now();
+    auto points = std::vector<std::pair<int, int>>();
+
+    std::unordered_set<std::pair<int, int>> visited;
+
+    std::pair<int, int> current_position = {0, 0};
+
+    while (true) {
+        
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::ofstream file("knight_problem_points.csv");
+    for (const auto& point : points) {
+        file << point.first << " " << point.second << std::endl;
+    }
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
 int main() {

@@ -18,11 +18,19 @@ import {
   defaultGraphPlanConfig,
   defaultPreviewPointCount,
   normalizeGraphBounds,
+  normalizeColorConfig,
   sliceToPointLimit,
   type CoordinateSystem,
   type GraphBounds,
   type GraphPlanConfig,
 } from './lib/graphPlanConfig'
+import { normalizeGraphPlan } from './lib/presetCsv'
+import { buildPixelCellFills, withColorSourceForData } from './lib/applyPointColors'
+import {
+  coerceColorSource,
+  type ColorMappingMode,
+  type ColorSource,
+} from './lib/colorConfig'
 import { suggestPreviewBounds } from './lib/previewBounds'
 import {
   plotRows,
@@ -77,7 +85,11 @@ function App() {
         setCombinedHasZ(parsed.hasZ)
         setFileName(name)
         if (parsed.preset) {
-          setGraphPlan(parsed.preset.graphPlan)
+          setGraphPlan(
+            normalizeGraphPlan(parsed.preset.graphPlan, {
+              hasZ: parsed.hasZ,
+            }),
+          )
           setCfg(parsed.preset.vizConfig)
         } else {
           const previewN = defaultPreviewPointCount(parsed.rows.length)
@@ -85,6 +97,7 @@ function App() {
             ...p,
             previewPointCount: previewN,
             pointCount: null,
+            color: withColorSourceForData(undefined, parsed.hasZ),
             bounds: suggestPreviewBounds(
               sliceToPointLimit(parsed.rows, previewN),
               p.coordinateSystem,
@@ -129,6 +142,7 @@ function App() {
             return {
               ...gp,
               previewPointCount: previewN,
+              color: withColorSourceForData(gp.color, merged.hasZ),
               bounds: suggestPreviewBounds(
                 sliceToPointLimit(merged.rows, previewN),
                 gp.coordinateSystem,
@@ -253,8 +267,12 @@ function App() {
   }, [])
 
   const previewPoints = useMemo(
-    () => resolveChartPoints(previewRowsData, graphPlan, cfg),
-    [previewRowsData, graphPlan, cfg],
+    () =>
+      resolveChartPoints(previewRowsData, graphPlan, cfg, {
+        hasZ,
+        useRowsAsIs: true,
+      }),
+    [previewRowsData, graphPlan, cfg, hasZ],
   )
 
   const canCreateGraph = plotRowsData.length > 0
@@ -326,6 +344,22 @@ function App() {
   const isPolar = graphPlan.coordinateSystem === 'polar'
   const showRectPixels = graphPlan.usePixels && !isPolar
   const showGrid = graphPlan.gridLines === 'yes'
+  const threeDColorOn = graphPlan.threeD === 'yes-with-color'
+
+  const previewCellFills = useMemo(() => {
+    if (!threeDColorOn || !showRectPixels) return undefined
+    return buildPixelCellFills(previewRowsData, graphPlan, hasZ)
+  }, [previewRowsData, graphPlan, hasZ, threeDColorOn, showRectPixels])
+
+  const patchColor = useCallback(
+    (patch: Partial<GraphPlanConfig['color']>) => {
+      setGraphPlan((p) => ({
+        ...p,
+        color: normalizeColorConfig({ ...p.color, ...patch }, hasZ),
+      }))
+    },
+    [hasZ],
+  )
 
   const commitBound = useCallback((key: keyof GraphBounds, n: number) => {
     setGraphPlan((p) => ({
@@ -478,6 +512,7 @@ function App() {
                 rows={previewRowsData}
                 bounds={graphPlan.bounds}
                 showGrid={showGrid}
+                cellFills={previewCellFills}
               />
             ) : (
               <DataChart
@@ -724,20 +759,24 @@ function App() {
                 <label className="checkbox-inline">
                   <input
                     type="checkbox"
-                    checked={graphPlan.threeD === 'yes-with-color'}
+                    checked={threeDColorOn}
                     onChange={(e) =>
                       setGraphPlan((p) => ({
                         ...p,
                         threeD: e.target.checked ? 'yes-with-color' : 'no',
+                        color: e.target.checked
+                          ? withColorSourceForData(p.color, hasZ)
+                          : p.color,
                       }))
                     }
                   />
-                  3D
+                  3D (color)
                 </label>
                 <label className="checkbox-inline">
                   <input
                     type="checkbox"
                     checked={graphPlan.multicolored === 'yes'}
+                    disabled={threeDColorOn}
                     onChange={(e) =>
                       setGraphPlan((p) => ({
                         ...p,
@@ -748,6 +787,107 @@ function App() {
                   Multicolor
                 </label>
               </div>
+
+              {threeDColorOn && (
+                <div className="color-settings">
+                  <label className="field">
+                    <span>Color from</span>
+                    <select
+                      value={graphPlan.color.source}
+                      onChange={(e) =>
+                        patchColor({
+                          source: coerceColorSource(
+                            e.target.value as ColorSource,
+                            hasZ,
+                          ),
+                        })
+                      }
+                    >
+                      <option value="x">{isPolar ? 'Radius (x)' : 'X'}</option>
+                      <option value="y">{isPolar ? 'Angle θ (y)' : 'Y'}</option>
+                      {hasZ && <option value="z">Z</option>}
+                    </select>
+                  </label>
+                  <label className="metric">
+                    <span className="metric-label">Value at 0</span>
+                    <DeferredNumberInput
+                      optional
+                      value={graphPlan.color.valueMin}
+                      placeholder="auto (min)"
+                      onCommit={(n) => patchColor({ valueMin: n })}
+                    />
+                  </label>
+                  <label className="metric">
+                    <span className="metric-label">Value at 255</span>
+                    <DeferredNumberInput
+                      optional
+                      value={graphPlan.color.valueMax}
+                      placeholder="auto (max)"
+                      onCommit={(n) => patchColor({ valueMax: n })}
+                    />
+                  </label>
+                  <label className="field color-swatch-field">
+                    <span>Low color</span>
+                    <input
+                      type="color"
+                      value={
+                        graphPlan.color.colorLow.startsWith('#')
+                          ? graphPlan.color.colorLow
+                          : '#0f172a'
+                      }
+                      onChange={(e) =>
+                        patchColor({ colorLow: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="field color-swatch-field">
+                    <span>High color</span>
+                    <input
+                      type="color"
+                      value={
+                        graphPlan.color.colorHigh.startsWith('#')
+                          ? graphPlan.color.colorHigh
+                          : '#38bdf8'
+                      }
+                      onChange={(e) =>
+                        patchColor({ colorHigh: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Mapping</span>
+                    <select
+                      value={graphPlan.color.mappingMode}
+                      onChange={(e) =>
+                        patchColor({
+                          mappingMode: e.target.value as ColorMappingMode,
+                        })
+                      }
+                    >
+                      <option value="linear">Linear (0–255)</option>
+                      <option value="custom">Custom (mod 256)</option>
+                    </select>
+                  </label>
+                  {graphPlan.color.mappingMode === 'custom' && (
+                    <label className="field color-expr-field">
+                      <span>Custom f(v)</span>
+                      <input
+                        type="text"
+                        className="color-expr-input"
+                        value={graphPlan.color.customExpression}
+                        placeholder="e.g. 255 - v, v * 2, (v + 40) % 256"
+                        spellCheck={false}
+                        onChange={(e) =>
+                          patchColor({ customExpression: e.target.value })
+                        }
+                      />
+                      <span className="field-hint">
+                        v is 0–255 after scaling; result mod 256 picks color.
+                      </span>
+                    </label>
+                  )}
+                </div>
+              )}
 
               <div className="bounds-row">
                 <label className="metric">

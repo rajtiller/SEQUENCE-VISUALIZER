@@ -1,9 +1,7 @@
 add option to display one step at a time
 allow multiple graphs to be on the same plot
-allow pixels to change color
 implement a database which allows you to save certain graphs
 allow more points to be plotted
-implement all the color and color changing aspects
 accept multiple data types and label
 should i add numbers to certain things? is the beauty supposed to be purely visual, meaning there's some elegnace in only drawing and not writing?
 make it so ordering of graphs can be changed when theres multiple on a plot
